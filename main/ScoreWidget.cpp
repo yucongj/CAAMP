@@ -51,7 +51,9 @@ ScoreWidget::ScoreWidget(bool withZoomControls, QWidget *parent) :
     m_page(-1),
     m_scale(100),
     m_mode(InteractionMode::None),
-    m_mouseActive(false)
+    m_mouseActive(false),
+    m_aspectRatioAtLoad(1.0),
+    m_switchLayoutAtThisAspectRatio(1.2)
 {
     setFrameStyle(Panel | Plain);
     setMinimumSize(QSize(100, 100));
@@ -85,6 +87,10 @@ ScoreWidget::ScoreWidget(bool withZoomControls, QWidget *parent) :
         m_scale = settings.value("scale", m_scale).toInt();
         settings.endGroup();
     }
+
+    m_resizedTimer.setSingleShot(true);
+    connect(&m_resizedTimer, &QTimer::timeout,
+            this, &ScoreWidget::resizedTimerElapsed);
 }
 
 ScoreWidget::~ScoreWidget()
@@ -154,8 +160,6 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
         errorString = "No Verovio resource path available: application was not packaged properly";
         return false;
     }
-    
-    clearSelection();
 
     m_svgPages.clear();
     m_noteSystemExtentMap.clear();
@@ -176,19 +180,47 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
         return false;
     }
 
-    string defaultOptions = "\"footer\": \"none\"";
+    std::cout << toolkit.GetOptionUsageString() << std::endl;
+    
+    std::cout << toolkit.GetAvailableOptions() << std::endl;
+
+    double myAspectRatio = double(width()) / double(height());
+    m_aspectRatioAtLoad = myAspectRatio;
+    bool singleSystem = (myAspectRatio > m_switchLayoutAtThisAspectRatio);
+    int pageHeight = 2970; // A4
+    int pageWidth = 2100; // A4
+
+    // JSON requires double-quotes, but construct with single because
+    // it's clearer to type, then switch to double afterwards!
+    QString options = QString("{ 'footer': 'none', 'systemMaxPerPage': %1, 'pageWidth': %2, 'pageHeight': %3, 'scaleToPageSize': %4 }");
+
+    if (singleSystem) {
+        options = options.arg(1); // systemMaxPerPage
+        pageWidth = int(ceil(myAspectRatio * pageHeight));
+        // The next line is just a clumsy way of ensuring a certain
+        // amount of top margin - there doesn't seem (?) to be a way
+        // to centre vertically other than to justify, which spaces
+        // out the staffs within the system
+        pageHeight = int(floor(pageHeight / sqrt(myAspectRatio)));
+    } else {
+        options = options.arg(0); // systemMaxPerPage
+    }
+
+    options = options.arg(pageWidth).arg(pageHeight);
+    options = options.arg(m_scale == 100 ? "false" : "true"); // scaleToPageSize
+    options = options.replace('\'', '"');
+    
+    toolkit.SetOptions(options.toStdString());
     
     if (m_scale != 100) {
-        toolkit.SetOptions("{\"scaleToPageSize\": true, " + defaultOptions + "}");
         if (!toolkit.SetScale(m_scale)) {
             SVDEBUG << "ScoreWidget::loadScoreFile: Failed to set rendering scale" << endl;
         } else {
             SVDEBUG << "ScoreWidget::loadScoreFile: Set scale to " << m_scale << endl;
         }
-        SVDEBUG << "options: " << toolkit.GetOptions() << endl;
-    } else {
-        toolkit.SetOptions("{" + defaultOptions + "}");
     }
+    
+    SVDEBUG << "options: " << toolkit.GetOptions() << endl;
     
     if (!toolkit.LoadFile(scoreFile.toStdString())) {
         SVDEBUG << "ScoreWidget::loadScoreFile: Load failed in Verovio toolkit" << endl;
@@ -440,6 +472,29 @@ ScoreWidget::resizeEvent(QResizeEvent *)
 {
     if (m_page >= 0) {
         showPage(m_page);
+    }
+
+    m_resizedTimer.start(800);
+}
+
+void
+ScoreWidget::resizedTimerElapsed()
+{
+    double aspect = double(width()) / double(height());
+
+    if (aspect <= m_switchLayoutAtThisAspectRatio &&
+        m_aspectRatioAtLoad <= m_switchLayoutAtThisAspectRatio) {
+        return;
+    }
+
+    if (fabs(aspect - m_aspectRatioAtLoad) < 0.01) {
+        return;
+    }
+    
+    QString error;
+    loadScoreFile(m_scoreName, m_scoreFilename, error);
+    if (error != "") {
+        SVDEBUG << error << endl;
     }
 }
 

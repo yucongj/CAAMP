@@ -15,6 +15,7 @@
 
 #include <QTemporaryDir>
 #include <QFrame>
+#include <QTimer>
 
 #include <map>
 
@@ -134,6 +135,9 @@ public slots:
     void zoomIn();
     void zoomReset();
     void zoomOut();
+
+private slots:
+    void resizedTimerElapsed();
     
 signals:
     void loadFailed(QString scoreNameOrFile, QString errorMessage);
@@ -243,6 +247,10 @@ private:
     
     QTransform m_widgetToPage;
     QTransform m_pageToWidget;
+
+    QTimer m_resizedTimer;
+    double m_aspectRatioAtLoad;
+    const double m_switchLayoutAtThisAspectRatio;
 };
 
 #endif
