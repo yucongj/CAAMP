@@ -249,8 +249,10 @@ private:
     QTransform m_pageToWidget;
 
     QTimer m_resizedTimer;
+    QSize m_initialSize;
     double m_aspectRatioAtLoad;
     const double m_switchLayoutAtThisAspectRatio;
+    const double m_widestAllowableAspectRatio;
 };
 
 #endif

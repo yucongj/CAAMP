@@ -53,7 +53,8 @@ ScoreWidget::ScoreWidget(bool withZoomControls, QWidget *parent) :
     m_mode(InteractionMode::None),
     m_mouseActive(false),
     m_aspectRatioAtLoad(1.0),
-    m_switchLayoutAtThisAspectRatio(1.2)
+    m_switchLayoutAtThisAspectRatio(1.2),
+    m_widestAllowableAspectRatio(10.0)
 {
     setFrameStyle(Panel | Plain);
     setMinimumSize(QSize(100, 100));
@@ -192,21 +193,30 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
 
     // JSON requires double-quotes, but construct with single because
     // it's clearer to type, then switch to double afterwards!
-    QString options = QString("{ 'footer': 'none', 'systemMaxPerPage': %1, 'pageWidth': %2, 'pageHeight': %3, 'scaleToPageSize': %4 }");
+    QString options = QString("{ 'footer': 'none', 'systemMaxPerPage': %1, 'pageWidth': %2, 'pageHeight': %3, 'adjustPageHeight': %4, 'scaleToPageSize': %5 }");
 
     if (singleSystem) {
         options = options.arg(1); // systemMaxPerPage
-        pageWidth = int(ceil(myAspectRatio * pageHeight));
-        // The next line is just a clumsy way of ensuring a certain
-        // amount of top margin - there doesn't seem (?) to be a way
-        // to centre vertically other than to justify, which spaces
-        // out the staffs within the system
-        pageHeight = int(floor(pageHeight / sqrt(myAspectRatio)));
+
+        // NB Verovio page height limited to 100-60000 and width to 100-100000
+        double heightRatio = double(height()) / double(m_initialSize.height());
+        if (heightRatio < 1.0) {
+            pageHeight = int(ceil(pageHeight * heightRatio));
+        }
+        double aspectRatioToUse =
+            std::min(myAspectRatio, m_widestAllowableAspectRatio);
+        pageWidth = int(ceil(aspectRatioToUse * pageHeight));
+
+        SVDEBUG << "Using single-system layout: initial height = " << m_initialSize.height() << ", height = " << height() << ", width = " << width() << ", myAspectRatio = " << myAspectRatio << ", setting pageHeight = " << pageHeight << " and pageWidth = " << pageWidth << endl;
+        
+        options = options.arg(pageWidth).arg(pageHeight);
+        options = options.arg("true"); // adjustPageHeight
     } else {
         options = options.arg(0); // systemMaxPerPage
+        options = options.arg(pageWidth).arg(pageHeight);
+        options = options.arg("false"); // adjustPageHeight
     }
 
-    options = options.arg(pageWidth).arg(pageHeight);
     options = options.arg(m_scale == 100 ? "false" : "true"); // scaleToPageSize
     options = options.replace('\'', '"');
     
@@ -474,7 +484,7 @@ ScoreWidget::resizeEvent(QResizeEvent *)
         showPage(m_page);
     }
 
-    m_resizedTimer.start(800);
+    m_resizedTimer.start(250);
 }
 
 void
@@ -801,6 +811,10 @@ ScoreWidget::paintEvent(QPaintEvent *e)
 {
     QFrame::paintEvent(e);
 
+    if (m_initialSize == QSize()) {
+        m_initialSize = size();
+    }
+    
     if (m_page < 0 || m_page >= getPageCount()) {
         SVDEBUG << "ScoreWidget::paintEvent: No page or page out of range, painting nothing" << endl;
         return;
