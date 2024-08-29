@@ -51,7 +51,10 @@ ScoreWidget::ScoreWidget(bool withZoomControls, QWidget *parent) :
     m_page(-1),
     m_scale(100),
     m_mode(InteractionMode::None),
-    m_mouseActive(false)
+    m_mouseActive(false),
+    m_aspectRatioAtLoad(1.0),
+    m_switchLayoutAtThisAspectRatio(1.2),
+    m_widestAllowableAspectRatio(10.0)
 {
     setFrameStyle(Panel | Plain);
     setMinimumSize(QSize(100, 100));
@@ -85,6 +88,10 @@ ScoreWidget::ScoreWidget(bool withZoomControls, QWidget *parent) :
         m_scale = settings.value("scale", m_scale).toInt();
         settings.endGroup();
     }
+
+    m_resizedTimer.setSingleShot(true);
+    connect(&m_resizedTimer, &QTimer::timeout,
+            this, &ScoreWidget::resizedTimerElapsed);
 }
 
 ScoreWidget::~ScoreWidget()
@@ -154,8 +161,6 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
         errorString = "No Verovio resource path available: application was not packaged properly";
         return false;
     }
-    
-    clearSelection();
 
     m_svgPages.clear();
     m_noteSystemExtentMap.clear();
@@ -175,15 +180,58 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
         SVDEBUG << "ScoreWidget::loadScoreFile: Failed to set Verovio resource path" << endl;
         return false;
     }
+
+    std::cout << toolkit.GetOptionUsageString() << std::endl;
+    
+    std::cout << toolkit.GetAvailableOptions() << std::endl;
+
+    double myAspectRatio = double(width()) / double(height());
+    m_aspectRatioAtLoad = myAspectRatio;
+    bool singleSystem = (myAspectRatio > m_switchLayoutAtThisAspectRatio);
+    int pageHeight = 2970; // A4
+    int pageWidth = 2100; // A4
+
+    // JSON requires double-quotes, but construct with single because
+    // it's clearer to type, then switch to double afterwards!
+    QString options = QString("{ 'footer': 'none', 'systemMaxPerPage': %1, 'pageWidth': %2, 'pageHeight': %3, 'adjustPageHeight': %4, 'scaleToPageSize': %5 }");
+
+    if (singleSystem) {
+        options = options.arg(1); // systemMaxPerPage
+
+        // NB Verovio page height limited to 100-60000 and width to 100-100000
+        double heightRatio = double(height()) / double(m_initialSize.height());
+        if (heightRatio < 1.0) {
+            pageHeight = int(ceil(pageHeight * heightRatio));
+        }
+        double aspectRatioToUse =
+            std::min(myAspectRatio, m_widestAllowableAspectRatio);
+        pageWidth = int(ceil(aspectRatioToUse * pageHeight));
+
+        SVDEBUG << "Using single-system layout: initial height = " << m_initialSize.height() << ", height = " << height() << ", width = " << width() << ", myAspectRatio = " << myAspectRatio << ", setting pageHeight = " << pageHeight << " and pageWidth = " << pageWidth << endl;
+        
+        options = options.arg(pageWidth).arg(pageHeight);
+        options = options.arg("true"); // adjustPageHeight
+    } else {
+        options = options.arg(0); // systemMaxPerPage
+        options = options.arg(pageWidth).arg(pageHeight);
+        options = options.arg("false"); // adjustPageHeight
+    }
+
+    options = options.arg(m_scale == 100 ? "false" : "true"); // scaleToPageSize
+    options = options.replace('\'', '"');
+    
+    toolkit.SetOptions(options.toStdString());
+    
     if (m_scale != 100) {
-        toolkit.SetOptions("{\"scaleToPageSize\": true}");
         if (!toolkit.SetScale(m_scale)) {
             SVDEBUG << "ScoreWidget::loadScoreFile: Failed to set rendering scale" << endl;
         } else {
             SVDEBUG << "ScoreWidget::loadScoreFile: Set scale to " << m_scale << endl;
         }
-        SVDEBUG << "options: " << toolkit.GetOptions() << endl;
     }
+    
+    SVDEBUG << "options: " << toolkit.GetOptions() << endl;
+    
     if (!toolkit.LoadFile(scoreFile.toStdString())) {
         SVDEBUG << "ScoreWidget::loadScoreFile: Load failed in Verovio toolkit" << endl;
         return false;
@@ -434,6 +482,29 @@ ScoreWidget::resizeEvent(QResizeEvent *)
 {
     if (m_page >= 0) {
         showPage(m_page);
+    }
+
+    m_resizedTimer.start(250);
+}
+
+void
+ScoreWidget::resizedTimerElapsed()
+{
+    double aspect = double(width()) / double(height());
+
+    if (aspect <= m_switchLayoutAtThisAspectRatio &&
+        m_aspectRatioAtLoad <= m_switchLayoutAtThisAspectRatio) {
+        return;
+    }
+
+    if (fabs(aspect - m_aspectRatioAtLoad) < 0.01) {
+        return;
+    }
+    
+    QString error;
+    loadScoreFile(m_scoreName, m_scoreFilename, error);
+    if (error != "") {
+        SVDEBUG << error << endl;
     }
 }
 
@@ -740,6 +811,10 @@ ScoreWidget::paintEvent(QPaintEvent *e)
 {
     QFrame::paintEvent(e);
 
+    if (m_initialSize == QSize()) {
+        m_initialSize = size();
+    }
+    
     if (m_page < 0 || m_page >= getPageCount()) {
         SVDEBUG << "ScoreWidget::paintEvent: No page or page out of range, painting nothing" << endl;
         return;
