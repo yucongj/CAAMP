@@ -124,19 +124,14 @@ ScoreWidget::setScale(int scale)
         return;
     }
     m_scale = scale;
-    auto scoreName = m_scoreName;
-    auto scoreFilename = m_scoreFilename;
-    auto musicalEvents = m_musicalEvents;
+
     QString errorString;
-    if (!loadScoreFile(scoreName, scoreFilename, errorString)) {
-        SVCERR << "ScoreWidget::setScale: Failed to reload score "
-               << scoreName << ": " << errorString << endl;
+    if (!reloadScoreFile(errorString)) {
+        SVCERR << "ScoreWidget::setScale: Failed to reload score: "
+               << errorString << endl;
         return;
     }
-    setMusicalEvents(musicalEvents);
-    if (m_highlightEventLabel != "") {
-        setHighlightEventByLabel(m_highlightEventLabel);
-    }
+
     update();
     
     QSettings settings;
@@ -254,7 +249,7 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
         shared_ptr<QSvgRenderer> renderer = make_shared<QSvgRenderer>(svgData);
         renderer->setAspectRatioMode(Qt::KeepAspectRatio);
 
-        SVDEBUG << "ScoreWidget::showPage: created renderer from "
+        SVDEBUG << "ScoreWidget::loadScoreFile: created renderer from "
                 << svgData.size() << "-byte SVG data" << endl;
 
         m_svgPages.push_back(renderer);
@@ -271,6 +266,55 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
     return true;
 }
 
+bool
+ScoreWidget::reloadScoreFile(QString &errorString)
+{
+    auto scoreName = m_scoreName;
+    auto scoreFilename = m_scoreFilename;
+    auto musicalEvents = m_musicalEvents;
+
+    auto highlightEventLabel = m_highlightEventLabel;
+
+    auto selectStartLabel = m_selectStart.label;
+    auto selectEndLabel = m_selectEnd.label;
+        
+    QString firstEventOnPageId;
+    if (m_page > 0 && !m_pageEventsMap[m_page].empty()) {
+        firstEventOnPageId = m_pageEventsMap[m_page][0];
+    }
+
+    SVDEBUG << "ScoreWidget::reloadScoreFile: saved highlightEventLabel as \""
+            << highlightEventLabel << "\" and firstEventOnPageId as \""
+            << firstEventOnPageId << "\"" << endl;
+    
+    if (!loadScoreFile(scoreName, scoreFilename, errorString)) {
+        return false;
+    }
+
+    SVDEBUG << "ScoreWidget::reloadScoreFile: reloaded, resetting musical events to recreate page maps" << endl;
+    
+    setMusicalEvents(musicalEvents);
+
+    if (selectStartLabel != "") {
+        m_selectStart = getEventWithLabel(selectStartLabel);
+    }
+    if (selectEndLabel != "") {
+        m_selectEnd = getEventWithLabel(selectEndLabel);
+    }
+
+    if (highlightEventLabel != "") {
+        SVDEBUG << "ScoreWidget::reloadScoreFile: resetting to highlighted event" << endl;
+        setHighlightEventByLabel(highlightEventLabel);
+    } else if (firstEventOnPageId != "") {
+        SVDEBUG << "ScoreWidget::reloadScoreFile: resetting to first event on page" << endl;
+        auto firstEventOnPage = getEventWithId(firstEventOnPageId);
+        if (!firstEventOnPage.isNull()) {
+            showPage(firstEventOnPage.page);
+        }
+    }
+
+    return true;
+}
 
 void
 ScoreWidget::findSystemExtents(QByteArray svgData, shared_ptr<QSvgRenderer> renderer)
@@ -502,8 +546,7 @@ ScoreWidget::resizedTimerElapsed()
     }
     
     QString error;
-    loadScoreFile(m_scoreName, m_scoreFilename, error);
-    if (error != "") {
+    if (!reloadScoreFile(error)) {
         SVDEBUG << error << endl;
     }
 }
