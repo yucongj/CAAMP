@@ -244,6 +244,8 @@ private:
     QRectF getHighlightRectFor(const EventData &);
     
     void findSystemExtents(QByteArray, std::shared_ptr<QSvgRenderer>);
+
+    bool reloadScoreFile(QString &error);
     
     QTransform m_widgetToPage;
     QTransform m_pageToWidget;
