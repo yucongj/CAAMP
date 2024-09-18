@@ -430,6 +430,12 @@ main(int argc, char **argv)
     settings.endGroup();
 
     settings.beginGroup("Preferences");
+    if (!settings.contains("resample-on-load")) {
+        settings.setValue("resample-on-load", true);
+    }
+    settings.endGroup();
+
+    settings.beginGroup("Preferences");
     if (showSplash) {
         if (!settings.value("show-splash", true).toBool()) {
             showSplash = false;
