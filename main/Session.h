@@ -60,7 +60,7 @@ public slots:
                      sv::Pane *featurePane,
                      sv::Layer *timeRuler);
 
-    void addAudioPane(sv::Pane *audioPane);
+    void addFurtherAudioPane(sv::Pane *audioPane);
     
     void unsetDocument();
     
@@ -108,8 +108,6 @@ private:
     std::vector<sv::Pane *> m_audioPanes;
     sv::Pane *m_featurePane;
     sv::Layer *m_timeRulerLayer;
-    sv::WaveformLayer *m_waveformLayer;
-    sv::SpectrogramLayer *m_spectrogramLayer;
 
     sv::sv_frame_t m_partialAlignmentAudioStart;
     sv::sv_frame_t m_partialAlignmentAudioEnd;
@@ -122,6 +120,8 @@ private:
     sv::TimeValueLayer *m_tempoLayer;
 
     bool m_inEditMode;
+
+    sv::ModelId getAudioModelFromPane(sv::Pane *);
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();

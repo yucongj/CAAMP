@@ -3747,14 +3747,18 @@ MainWindow::importMoreAudio()
     AddPaneCommand *command = new AddPaneCommand(this, addAtIndex);
     CommandHistory::getInstance()->addCommand(command);
 
+    Pane *pane = command->getPane();
+    
     if (openAudio(path, ReplaceCurrentPane) == FileOpenFailed) {
         emit hideSplash();
-        RemovePaneCommand *rcommand = new RemovePaneCommand
-            (this, command->getPane());
+        RemovePaneCommand *rcommand = new RemovePaneCommand(this, pane);
         CommandHistory::getInstance()->addCommand(rcommand);
         QMessageBox::critical(this, tr("Failed to open file"),
                               tr("<b>File open failed</b><p>Audio file \"%1\" could not be opened").arg(path));
+        return;
     }
+
+    m_session.addFurtherAudioPane(pane);
 }
 
 void

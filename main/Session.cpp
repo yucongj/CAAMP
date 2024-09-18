@@ -62,8 +62,6 @@ Session::setDocument(Document *doc,
     m_audioPanes.push_back(mainAudioPane);
     m_featurePane = featurePane;
     m_timeRulerLayer = timeRuler;
-    m_waveformLayer = nullptr;
-    m_spectrogramLayer = nullptr;
 
     m_partialAlignmentAudioStart = -1;
     m_partialAlignmentAudioEnd = -1;
@@ -77,12 +75,6 @@ Session::setDocument(Document *doc,
     m_inEditMode = false;
 
     resetAlignmentEntries();
-}
-
-void
-Session::addAudioPane(Pane *audioPane)
-{
-    m_audioPanes.push_back(audioPane);
 }
 
 void
@@ -136,32 +128,70 @@ Session::setMainModel(ModelId modelId, QString scoreId)
         return;
     }
 
-    if (m_waveformLayer) {
-        //!!! Review this
-        SVDEBUG << "Session::setMainModel: Waveform layer already exists - currently we expect a process by which the document and panes are created and then setMainModel called here only once per document" << endl;
-        return;
-    }
-
     m_document->addLayerToView(m_featurePane, m_timeRulerLayer);
     
     ColourDatabase *cdb = ColourDatabase::getInstance();
 
-    m_waveformLayer = qobject_cast<WaveformLayer *>
+    WaveformLayer *waveformLayer = qobject_cast<WaveformLayer *>
         (m_document->createLayer(LayerFactory::Waveform));
-    m_waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
+    waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
     
-    m_document->addLayerToView(m_featurePane, m_waveformLayer);
-    m_document->setModel(m_waveformLayer, modelId);
+    m_document->addLayerToView(m_featurePane, waveformLayer);
+    m_document->setModel(waveformLayer, modelId);
 
-    m_spectrogramLayer = qobject_cast<SpectrogramLayer *>
+    SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
         (m_document->createLayer(LayerFactory::MelodicRangeSpectrogram));
-    m_spectrogramLayer->setBinScale(BinScale::Linear);
-    m_spectrogramLayer->setColourMap(ColourMapper::Green);
-    m_spectrogramLayer->setColourScale(ColourScaleType::Log);
-    m_spectrogramLayer->setColourScaleMultiple(2.0);
+    spectrogramLayer->setBinScale(BinScale::Linear);
+    spectrogramLayer->setColourMap(ColourMapper::Green);
+    spectrogramLayer->setColourScale(ColourScaleType::Log);
+    spectrogramLayer->setColourScaleMultiple(2.0);
 
-    m_document->addLayerToView(m_audioPanes[0], m_spectrogramLayer);
-    m_document->setModel(m_spectrogramLayer, modelId);
+    m_document->addLayerToView(m_audioPanes[0], spectrogramLayer);
+    m_document->setModel(spectrogramLayer, modelId);
+}
+
+ModelId
+Session::getAudioModelFromPane(Pane *pane)
+{
+    int n = pane->getLayerCount();
+
+    for (int i = 0; i < n; ++i) {
+
+        auto layer = pane->getLayer(i);
+
+        auto waveformLayer = qobject_cast<WaveformLayer *>(layer);
+        if (waveformLayer) {
+            return waveformLayer->getModel();
+        }
+        
+        auto spectrogramLayer = qobject_cast<SpectrogramLayer *>(layer);
+        if (spectrogramLayer) {
+            return spectrogramLayer->getModel();
+        }
+    }
+}
+
+void
+Session::addFurtherAudioPane(Pane *audioPane)
+{
+    m_audioPanes.push_back(audioPane);
+
+    ModelId modelId = getAudioModelFromPane(audioPane);
+
+    if (modelId.isNone()) {
+        SVDEBUG << "Session::addAudioPane: WARNING: Unable to retrieve audio model from pane" << endl;
+        return;
+    }
+
+    SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
+        (m_document->createLayer(LayerFactory::MelodicRangeSpectrogram));
+    spectrogramLayer->setBinScale(BinScale::Linear);
+    spectrogramLayer->setColourMap(ColourMapper::Green);
+    spectrogramLayer->setColourScale(ColourScaleType::Log);
+    spectrogramLayer->setColourScaleMultiple(2.0);
+
+    m_document->addLayerToView(audioPane, spectrogramLayer);
+    m_document->setModel(spectrogramLayer, modelId);
 }
 
 void
