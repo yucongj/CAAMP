@@ -56,10 +56,12 @@ public:
 
 public slots:
     void setDocument(sv::Document *,
-                     sv::Pane *topPane,
-                     sv::Pane *bottomPane,
+                     sv::Pane *topAudioPane,
+                     sv::Pane *featurePane,
                      sv::Layer *timeRuler);
 
+    void addAudioPane(sv::Pane *audioPane);
+    
     void unsetDocument();
     
     void setMainModel(sv::ModelId modelId, QString scoreId);
@@ -103,8 +105,8 @@ private:
     sv::ModelId m_mainModel;
     sv::TransformId m_alignmentTransformId;
 
-    sv::Pane *m_topPane;
-    sv::Pane *m_bottomPane;
+    std::vector<sv::Pane *> m_audioPanes;
+    sv::Pane *m_featurePane;
     sv::Layer *m_timeRulerLayer;
     sv::WaveformLayer *m_waveformLayer;
     sv::SpectrogramLayer *m_spectrogramLayer;

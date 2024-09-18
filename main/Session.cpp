@@ -44,8 +44,8 @@ Session::~Session()
 
 void
 Session::setDocument(Document *doc,
-                     Pane *topPane,
-                     Pane *bottomPane,
+                     Pane *mainAudioPane,
+                     Pane *featurePane,
                      Layer *timeRuler)
 {
     SVDEBUG << "Session::setDocument(" << doc << ")" << endl;
@@ -57,9 +57,10 @@ Session::setDocument(Document *doc,
     m_document = doc;
     m_scoreId = "";
     m_mainModel = {};
-    
-    m_topPane = topPane;
-    m_bottomPane = bottomPane;
+
+    m_audioPanes.clear();
+    m_audioPanes.push_back(mainAudioPane);
+    m_featurePane = featurePane;
     m_timeRulerLayer = timeRuler;
     m_waveformLayer = nullptr;
     m_spectrogramLayer = nullptr;
@@ -79,6 +80,12 @@ Session::setDocument(Document *doc,
 }
 
 void
+Session::addAudioPane(Pane *audioPane)
+{
+    m_audioPanes.push_back(audioPane);
+}
+
+void
 Session::unsetDocument()
 {
     setDocument(nullptr, nullptr, nullptr, nullptr);
@@ -93,7 +100,11 @@ Session::getOnsetsLayer()
 Pane *
 Session::getPaneContainingOnsetsLayer()
 {
-    return m_topPane;
+    if (m_audioPanes.empty()) {
+        return nullptr;
+    } else {
+        return m_audioPanes[0];
+    }
 }
 
 TimeValueLayer *
@@ -105,7 +116,7 @@ Session::getTempoLayer()
 Pane *
 Session::getPaneContainingTempoLayer()
 {
-    return m_bottomPane;
+    return m_featurePane;
 }
 
 void
@@ -131,7 +142,7 @@ Session::setMainModel(ModelId modelId, QString scoreId)
         return;
     }
 
-    m_document->addLayerToView(m_bottomPane, m_timeRulerLayer);
+    m_document->addLayerToView(m_featurePane, m_timeRulerLayer);
     
     ColourDatabase *cdb = ColourDatabase::getInstance();
 
@@ -139,7 +150,7 @@ Session::setMainModel(ModelId modelId, QString scoreId)
         (m_document->createLayer(LayerFactory::Waveform));
     m_waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
     
-    m_document->addLayerToView(m_bottomPane, m_waveformLayer);
+    m_document->addLayerToView(m_featurePane, m_waveformLayer);
     m_document->setModel(m_waveformLayer, modelId);
 
     m_spectrogramLayer = qobject_cast<SpectrogramLayer *>
@@ -149,7 +160,7 @@ Session::setMainModel(ModelId modelId, QString scoreId)
     m_spectrogramLayer->setColourScale(ColourScaleType::Log);
     m_spectrogramLayer->setColourScaleMultiple(2.0);
 
-    m_document->addLayerToView(m_topPane, m_spectrogramLayer);
+    m_document->addLayerToView(m_audioPanes[0], m_spectrogramLayer);
     m_document->setModel(m_spectrogramLayer, modelId);
 }
 
@@ -201,7 +212,7 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     
     vector<pair<QString, pair<Pane *, TimeInstantLayer **>>> layerDefinitions {
         { alignmentTransformId,
-          { m_topPane, &m_pendingOnsetsLayer }
+          { m_audioPanes[0], &m_pendingOnsetsLayer }
         }
     };
 
@@ -309,10 +320,10 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     // wanted to delete them entirely
     if (m_displayedOnsetsLayer) {
         m_acceptedOnsetsLayer = m_displayedOnsetsLayer;
-        m_topPane->removeLayer(m_displayedOnsetsLayer);
+        m_audioPanes[0]->removeLayer(m_displayedOnsetsLayer);
     }
     if (m_tempoLayer) {
-        m_bottomPane->removeLayer(m_tempoLayer);
+        m_featurePane->removeLayer(m_tempoLayer);
     }
         
     m_displayedOnsetsLayer = m_pendingOnsetsLayer;
@@ -372,7 +383,7 @@ Session::alignmentComplete()
     SVDEBUG << "Session::alignmentComplete" << endl;
 
     if (m_tempoLayer) {
-        m_bottomPane->addLayer(m_tempoLayer);
+        m_featurePane->addLayer(m_tempoLayer);
     }
 
     recalculateTempoLayer();
@@ -395,7 +406,7 @@ Session::rejectAlignment()
     m_pendingOnsetsLayer = nullptr;
 
     if (m_acceptedOnsetsLayer) {
-        m_topPane->addLayer(m_acceptedOnsetsLayer);
+        m_audioPanes[0]->addLayer(m_acceptedOnsetsLayer);
         m_displayedOnsetsLayer = m_acceptedOnsetsLayer;
         m_acceptedOnsetsLayer = nullptr;
     } else {
@@ -608,7 +619,7 @@ Session::importAlignmentFrom(QString path)
     if (!m_displayedOnsetsLayer) {
         m_displayedOnsetsLayer = dynamic_cast<TimeInstantLayer *>
             (m_document->createEmptyLayer(LayerFactory::TimeInstants));
-        m_document->addLayerToView(m_topPane, m_displayedOnsetsLayer);
+        m_document->addLayerToView(m_audioPanes[0], m_displayedOnsetsLayer);
         setOnsetsLayerProperties(m_displayedOnsetsLayer);
     }
     
@@ -713,7 +724,7 @@ Session::recalculateTempoLayer()
             (m_document->createLayer(LayerFactory::TimeValues));
         ColourDatabase *cdb = ColourDatabase::getInstance();
         m_tempoLayer->setBaseColour(cdb->getColourIndex(tr("Blue")));
-        m_document->addLayerToView(m_bottomPane, m_tempoLayer);
+        m_document->addLayerToView(m_featurePane, m_tempoLayer);
     }
 
     if (!m_displayedOnsetsLayer) {

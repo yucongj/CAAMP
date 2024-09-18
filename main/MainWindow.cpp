@@ -3739,6 +3739,8 @@ MainWindow::importMoreAudio()
         return;
     }
 
+    // Add the new audio in a new pane in penultimate position
+    
     int paneCountBefore = m_paneStack->getPaneCount();
     int addAtIndex = paneCountBefore - 1;
     
