@@ -721,16 +721,18 @@ MainWindow::setupFileMenu()
     m_keyReference->registerShortcut(action);
     toolbar->addAction(action);
     menu->addAction(action);
-/*!!!
+
     // We want this one to go on the toolbar now, if we add it at all,
     // but on the menu later
-    QAction *iaction = new QAction(tr("&Import More Audio..."), this);
+    QAction *iaction = new QAction(tr("Open Another Recording..."), this);
     iaction->setShortcut(tr("Ctrl+I"));
     iaction->setStatusTip(tr("Import an extra audio file into a new pane"));
     connect(iaction, SIGNAL(triggered()), this, SLOT(importMoreAudio()));
     connect(this, SIGNAL(canImportMoreAudio(bool)), iaction, SLOT(setEnabled(bool)));
     m_keyReference->registerShortcut(iaction);
-
+    menu->addAction(iaction);
+    
+/*!!!
     // We want this one to go on the toolbar now, if we add it at all,
     // but on the menu later
     QAction *raction = new QAction(tr("Replace &Main Audio..."), this);
@@ -3733,12 +3735,23 @@ MainWindow::importMoreAudio()
 {
     QString path = getOpenFileName(FileFinder::AudioFile);
 
-    if (path != "") {
-        if (openAudio(path, CreateAdditionalModel) == FileOpenFailed) {
-            emit hideSplash();
-            QMessageBox::critical(this, tr("Failed to open file"),
-                                  tr("<b>File open failed</b><p>Audio file \"%1\" could not be opened").arg(path));
-        }
+    if (path == "") {
+        return;
+    }
+
+    int paneCountBefore = m_paneStack->getPaneCount();
+    int addAtIndex = paneCountBefore - 1;
+    
+    AddPaneCommand *command = new AddPaneCommand(this, addAtIndex);
+    CommandHistory::getInstance()->addCommand(command);
+
+    if (openAudio(path, ReplaceCurrentPane) == FileOpenFailed) {
+        emit hideSplash();
+        RemovePaneCommand *rcommand = new RemovePaneCommand
+            (this, command->getPane());
+        CommandHistory::getInstance()->addCommand(rcommand);
+        QMessageBox::critical(this, tr("Failed to open file"),
+                              tr("<b>File open failed</b><p>Audio file \"%1\" could not be opened").arg(path));
     }
 }
 
