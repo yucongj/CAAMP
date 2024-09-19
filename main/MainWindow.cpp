@@ -224,8 +224,9 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     SVDEBUG << "MainWindow: Creating main user interface layout" << endl;
 
     // For Piano Precision, we want to constrain playback to selection
-    // by default
+    // by default, and we don't want to play multiple recordings at once
     m_viewManager->setPlaySelectionMode(true);
+    m_viewManager->setPlaySoloMode(true);
 
     QFrame *frame = new QFrame;
     setCentralWidget(frame);
