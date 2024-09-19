@@ -115,11 +115,8 @@ private:
     sv::sv_frame_t m_partialAlignmentAudioStart;
     sv::sv_frame_t m_partialAlignmentAudioEnd;
 
-    sv::TimeInstantLayer *m_displayedOnsetsLayer; // An alias for one of:
-    sv::TimeInstantLayer *m_acceptedOnsetsLayer;
     sv::TimeInstantLayer *m_pendingOnsetsLayer;
-    bool m_awaitingOnsetsLayer;
-    sv::ModelId m_awaitingFromAudioModel;
+    sv::ModelId m_audioModelForPendingOnsets;
     
     sv::TimeValueLayer *m_tempoLayer;
 
@@ -128,6 +125,7 @@ private:
     sv::ModelId getActiveAudioModel();
     sv::ModelId getAudioModelFromPane(sv::Pane *);
     sv::Pane *getAudioPaneForAudioModel(sv::ModelId);
+    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *);
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();
