@@ -125,7 +125,13 @@ private:
     sv::ModelId getActiveAudioModel();
     sv::ModelId getAudioModelFromPane(sv::Pane *);
     sv::Pane *getAudioPaneForAudioModel(sv::ModelId);
-    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *);
+
+    enum class OnsetsLayerSelection {
+        PermitPendingOnsets,
+        ExcludePendingOnsets
+    };
+    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *,
+                                                 OnsetsLayerSelection);
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();

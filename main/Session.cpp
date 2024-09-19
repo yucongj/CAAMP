@@ -87,7 +87,8 @@ Session::unsetDocument()
 TimeInstantLayer *
 Session::getOnsetsLayer()
 {
-    return getOnsetsLayerFromPane(getPaneContainingOnsetsLayer());
+    return getOnsetsLayerFromPane(getPaneContainingOnsetsLayer(),
+                                  OnsetsLayerSelection::PermitPendingOnsets);
 }
 
 Pane *
@@ -181,7 +182,7 @@ Session::getAudioModelFromPane(Pane *pane)
 }
 
 TimeInstantLayer *
-Session::getOnsetsLayerFromPane(Pane *pane)
+Session::getOnsetsLayerFromPane(Pane *pane, OnsetsLayerSelection selection)
 {
     if (!pane) {
         return nullptr;
@@ -189,17 +190,42 @@ Session::getOnsetsLayerFromPane(Pane *pane)
     
     int n = pane->getLayerCount();
 
-    for (int i = 0; i < n; ++i) {
+    // Prefer topmost non-dormant layer if more than one matches the
+    // selection
 
-        auto layer = pane->getLayer(i);
+    vector<TimeInstantLayer *> candidates;
+    
+    for (int i = n-1; i >= 0; --i) {
+        auto layer = qobject_cast<TimeInstantLayer *>(pane->getLayer(i));
+        if (!layer) {
+            continue;
+        }
+        if (layer == m_pendingOnsetsLayer &&
+            selection != OnsetsLayerSelection::PermitPendingOnsets) {
+            continue;
+        }
+        candidates.push_back(layer);
+    }
 
-        auto til = qobject_cast<TimeInstantLayer *>(layer);
-        if (til) {
-            return til;
+    TimeInstantLayer *any = nullptr;
+    TimeInstantLayer *nonDormant = nullptr;
+    
+    for (auto layer : candidates) {
+        if (!layer->isLayerDormant(pane)) {
+            if (!nonDormant) {
+                nonDormant = layer;
+            }
+        }
+        if (!any) {
+            any = layer;
         }
     }
 
-    return nullptr;
+    if (nonDormant) {
+        return nonDormant;
+    } else {
+        return any;
+    }
 }
 
 void
@@ -377,7 +403,8 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
 
     // Hide the existing layers
 
-    auto onsetsLayer = getOnsetsLayerFromPane(activeAudioPane);
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (activeAudioPane, OnsetsLayerSelection::ExcludePendingOnsets);
     if (onsetsLayer) {
         onsetsLayer->showLayer(activeAudioPane, false);
     }
@@ -500,8 +527,9 @@ Session::modelChanged(ModelId id)
 {
     SVDEBUG << "Session::modelChanged: model is " << id << endl;
 
-    auto mainOnsetsLayer = getOnsetsLayerFromPane(getAudioPaneForAudioModel
-                                                  (m_mainModel));
+    auto mainOnsetsLayer = getOnsetsLayerFromPane
+        (getAudioPaneForAudioModel(m_mainModel),
+         OnsetsLayerSelection::PermitPendingOnsets);
     
     if (mainOnsetsLayer && id == mainOnsetsLayer->getModel()) {
         recalculateTempoLayer();
@@ -539,7 +567,8 @@ Session::rejectAlignment()
 
     if (!m_audioModelForPendingOnsets.isNone()) {
         auto pane = getAudioPaneForAudioModel(m_audioModelForPendingOnsets);
-        auto previousOnsets = getOnsetsLayerFromPane(pane);
+        auto previousOnsets = getOnsetsLayerFromPane
+            (pane, OnsetsLayerSelection::ExcludePendingOnsets);
         if (previousOnsets) {
             previousOnsets->showLayer(pane, true);
         }
@@ -565,7 +594,8 @@ Session::acceptAlignment()
     }        
 
     auto pane = getAudioPaneForAudioModel(m_audioModelForPendingOnsets);
-    auto previousOnsets = getOnsetsLayerFromPane(pane);
+    auto previousOnsets = getOnsetsLayerFromPane
+        (pane, OnsetsLayerSelection::ExcludePendingOnsets);
     
     if (previousOnsets && m_partialAlignmentAudioEnd >= 0) {
         mergeLayers(previousOnsets, m_pendingOnsetsLayer,
@@ -762,7 +792,8 @@ Session::importAlignmentFrom(QString path)
         return false;
     }
     
-    auto onsetsLayer = getOnsetsLayerFromPane(pane);
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (pane, OnsetsLayerSelection::ExcludePendingOnsets);
     
     if (!onsetsLayer) {
         onsetsLayer = dynamic_cast<TimeInstantLayer *>
@@ -834,7 +865,8 @@ Session::updateAlignmentEntries()
         return false;
     }
     
-    auto onsetsLayer = getOnsetsLayerFromPane(pane);
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (pane, OnsetsLayerSelection::ExcludePendingOnsets);
 
     if (onsetsLayer) {
 
@@ -895,7 +927,8 @@ Session::recalculateTempoLayer()
         return;
     }
     
-    auto onsetsLayer = getOnsetsLayerFromPane(audioPane);
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (audioPane, OnsetsLayerSelection::PermitPendingOnsets);
 
     if (!onsetsLayer) {
         m_document->setModel(m_tempoLayer, newModelId);
@@ -945,7 +978,8 @@ Session::updateOnsetColours()
 {
     for (auto pane : m_audioPanes) {
 
-        auto onsetsLayer = getOnsetsLayerFromPane(pane);
+        auto onsetsLayer = getOnsetsLayerFromPane
+            (pane, OnsetsLayerSelection::PermitPendingOnsets);
 
         if (!onsetsLayer) {
             continue;
