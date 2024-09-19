@@ -66,6 +66,8 @@ public slots:
     
     void setMainModel(sv::ModelId modelId, QString scoreId);
 
+    void setActivePane(sv::Pane *);
+    
     void setAlignmentTransformId(sv::TransformId transformId);
     
     void beginAlignment();
@@ -107,21 +109,25 @@ private:
 
     std::vector<sv::Pane *> m_audioPanes;
     sv::Pane *m_featurePane;
+    sv::Pane *m_activePane; // an alias for one of the panes, or null
     sv::Layer *m_timeRulerLayer;
 
     sv::sv_frame_t m_partialAlignmentAudioStart;
     sv::sv_frame_t m_partialAlignmentAudioEnd;
-    
+
     sv::TimeInstantLayer *m_displayedOnsetsLayer; // An alias for one of:
     sv::TimeInstantLayer *m_acceptedOnsetsLayer;
     sv::TimeInstantLayer *m_pendingOnsetsLayer;
     bool m_awaitingOnsetsLayer;
+    sv::ModelId m_awaitingFromAudioModel;
     
     sv::TimeValueLayer *m_tempoLayer;
 
     bool m_inEditMode;
 
+    sv::ModelId getActiveAudioModel();
     sv::ModelId getAudioModelFromPane(sv::Pane *);
+    sv::Pane *getAudioPaneForAudioModel(sv::ModelId);
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();

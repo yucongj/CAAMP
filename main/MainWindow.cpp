@@ -5774,6 +5774,8 @@ MainWindow::currentPaneChanged(Pane *pane)
     if (containsMainModel && !panLayerSet) {
         m_panLayer->setModel(getMainModelId());
     }
+
+    m_session.setActivePane(pane);
 }
 
 void
