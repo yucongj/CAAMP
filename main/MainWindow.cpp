@@ -224,8 +224,9 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     SVDEBUG << "MainWindow: Creating main user interface layout" << endl;
 
     // For Piano Precision, we want to constrain playback to selection
-    // by default
+    // by default, and we don't want to play multiple recordings at once
     m_viewManager->setPlaySelectionMode(true);
+    m_viewManager->setPlaySoloMode(true);
 
     QFrame *frame = new QFrame;
     setCentralWidget(frame);
@@ -721,16 +722,18 @@ MainWindow::setupFileMenu()
     m_keyReference->registerShortcut(action);
     toolbar->addAction(action);
     menu->addAction(action);
-/*!!!
+
     // We want this one to go on the toolbar now, if we add it at all,
     // but on the menu later
-    QAction *iaction = new QAction(tr("&Import More Audio..."), this);
+    QAction *iaction = new QAction(tr("Open Another Recording..."), this);
     iaction->setShortcut(tr("Ctrl+I"));
     iaction->setStatusTip(tr("Import an extra audio file into a new pane"));
     connect(iaction, SIGNAL(triggered()), this, SLOT(importMoreAudio()));
     connect(this, SIGNAL(canImportMoreAudio(bool)), iaction, SLOT(setEnabled(bool)));
     m_keyReference->registerShortcut(iaction);
-
+    menu->addAction(iaction);
+    
+/*!!!
     // We want this one to go on the toolbar now, if we add it at all,
     // but on the menu later
     QAction *raction = new QAction(tr("Replace &Main Audio..."), this);
@@ -3733,13 +3736,30 @@ MainWindow::importMoreAudio()
 {
     QString path = getOpenFileName(FileFinder::AudioFile);
 
-    if (path != "") {
-        if (openAudio(path, CreateAdditionalModel) == FileOpenFailed) {
-            emit hideSplash();
-            QMessageBox::critical(this, tr("Failed to open file"),
-                                  tr("<b>File open failed</b><p>Audio file \"%1\" could not be opened").arg(path));
-        }
+    if (path == "") {
+        return;
     }
+
+    // Add the new audio in a new pane in penultimate position
+    
+    int paneCountBefore = m_paneStack->getPaneCount();
+    int addAtIndex = paneCountBefore - 1;
+    
+    AddPaneCommand *command = new AddPaneCommand(this, addAtIndex);
+    CommandHistory::getInstance()->addCommand(command);
+
+    Pane *pane = command->getPane();
+    
+    if (openAudio(path, ReplaceCurrentPane) == FileOpenFailed) {
+        emit hideSplash();
+        RemovePaneCommand *rcommand = new RemovePaneCommand(this, pane);
+        CommandHistory::getInstance()->addCommand(rcommand);
+        QMessageBox::critical(this, tr("Failed to open file"),
+                              tr("<b>File open failed</b><p>Audio file \"%1\" could not be opened").arg(path));
+        return;
+    }
+
+    m_session.addFurtherAudioPane(pane);
 }
 
 void
@@ -5755,6 +5775,8 @@ MainWindow::currentPaneChanged(Pane *pane)
     if (containsMainModel && !panLayerSet) {
         m_panLayer->setModel(getMainModelId());
     }
+
+    m_session.setActivePane(pane);
 }
 
 void

@@ -33,7 +33,7 @@
 
 #include "vrvtrim.h"
 
-#define DEBUG_SCORE_WIDGET 1
+//#define DEBUG_SCORE_WIDGET 1
 //#define DEBUG_EVENT_FINDING 1
 
 static QColor navigateHighlightColour("#59c4df");

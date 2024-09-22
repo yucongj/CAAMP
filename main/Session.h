@@ -56,14 +56,18 @@ public:
 
 public slots:
     void setDocument(sv::Document *,
-                     sv::Pane *topPane,
-                     sv::Pane *bottomPane,
+                     sv::Pane *topAudioPane,
+                     sv::Pane *featurePane,
                      sv::Layer *timeRuler);
 
+    void addFurtherAudioPane(sv::Pane *audioPane);
+    
     void unsetDocument();
     
     void setMainModel(sv::ModelId modelId, QString scoreId);
 
+    void setActivePane(sv::Pane *);
+    
     void setAlignmentTransformId(sv::TransformId transformId);
     
     void beginAlignment();
@@ -103,23 +107,31 @@ private:
     sv::ModelId m_mainModel;
     sv::TransformId m_alignmentTransformId;
 
-    sv::Pane *m_topPane;
-    sv::Pane *m_bottomPane;
+    std::vector<sv::Pane *> m_audioPanes;
+    sv::Pane *m_featurePane;
+    sv::Pane *m_activePane; // an alias for one of the panes, or null
     sv::Layer *m_timeRulerLayer;
-    sv::WaveformLayer *m_waveformLayer;
-    sv::SpectrogramLayer *m_spectrogramLayer;
 
     sv::sv_frame_t m_partialAlignmentAudioStart;
     sv::sv_frame_t m_partialAlignmentAudioEnd;
-    
-    sv::TimeInstantLayer *m_displayedOnsetsLayer; // An alias for one of:
-    sv::TimeInstantLayer *m_acceptedOnsetsLayer;
+
     sv::TimeInstantLayer *m_pendingOnsetsLayer;
-    bool m_awaitingOnsetsLayer;
+    sv::ModelId m_audioModelForPendingOnsets;
     
     sv::TimeValueLayer *m_tempoLayer;
 
     bool m_inEditMode;
+
+    sv::ModelId getActiveAudioModel();
+    sv::ModelId getAudioModelFromPane(sv::Pane *);
+    sv::Pane *getAudioPaneForAudioModel(sv::ModelId);
+
+    enum class OnsetsLayerSelection {
+        PermitPendingOnsets,
+        ExcludePendingOnsets
+    };
+    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *,
+                                                 OnsetsLayerSelection);
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();

@@ -44,8 +44,8 @@ Session::~Session()
 
 void
 Session::setDocument(Document *doc,
-                     Pane *topPane,
-                     Pane *bottomPane,
+                     Pane *mainAudioPane,
+                     Pane *featurePane,
                      Layer *timeRuler)
 {
     SVDEBUG << "Session::setDocument(" << doc << ")" << endl;
@@ -57,20 +57,20 @@ Session::setDocument(Document *doc,
     m_document = doc;
     m_scoreId = "";
     m_mainModel = {};
-    
-    m_topPane = topPane;
-    m_bottomPane = bottomPane;
+
+    m_audioPanes.clear();
+    if (mainAudioPane) {
+        m_audioPanes.push_back(mainAudioPane);
+    }
+    m_featurePane = featurePane;
+    m_activePane = mainAudioPane;
     m_timeRulerLayer = timeRuler;
-    m_waveformLayer = nullptr;
-    m_spectrogramLayer = nullptr;
 
     m_partialAlignmentAudioStart = -1;
     m_partialAlignmentAudioEnd = -1;
     
-    m_displayedOnsetsLayer = nullptr;
-    m_acceptedOnsetsLayer = nullptr;
     m_pendingOnsetsLayer = nullptr;
-    m_awaitingOnsetsLayer = false;
+    m_audioModelForPendingOnsets = {};
     
     m_tempoLayer = nullptr;
     m_inEditMode = false;
@@ -87,13 +87,14 @@ Session::unsetDocument()
 TimeInstantLayer *
 Session::getOnsetsLayer()
 {
-    return m_displayedOnsetsLayer;
+    return getOnsetsLayerFromPane(getPaneContainingOnsetsLayer(),
+                                  OnsetsLayerSelection::PermitPendingOnsets);
 }
 
 Pane *
 Session::getPaneContainingOnsetsLayer()
 {
-    return m_topPane;
+    return getAudioPaneForAudioModel(getActiveAudioModel());
 }
 
 TimeValueLayer *
@@ -105,7 +106,7 @@ Session::getTempoLayer()
 Pane *
 Session::getPaneContainingTempoLayer()
 {
-    return m_bottomPane;
+    return m_featurePane;
 }
 
 void
@@ -118,39 +119,204 @@ Session::setMainModel(ModelId modelId, QString scoreId)
 
     if (!m_document) {
         if (m_mainModel.isNone()) {
-            SVDEBUG << "Session::setMainModel: Cleared main model and no document set" << endl;
+            SVDEBUG << "Session::setMainModel: NOTE: Cleared main model and no document set" << endl;
         } else {
             SVDEBUG << "Session::setMainModel: WARNING: No document; one should have been set first" << endl;
         }
         return;
-    }
-
-    if (m_waveformLayer) {
-        //!!! Review this
-        SVDEBUG << "Session::setMainModel: Waveform layer already exists - currently we expect a process by which the document and panes are created and then setMainModel called here only once per document" << endl;
+    } else if (m_mainModel.isNone()) {
+        SVDEBUG << "Session::setMainModel: WARNING: Cleared main model, but there is a document active" << endl;
+        return;
+    } else if (m_audioPanes.empty() || !m_featurePane) {
+        SVDEBUG << "Session::setMainModel: WARNING: Set a main model but we have no audio panes and/or no feature pane" << endl;
         return;
     }
 
-    m_document->addLayerToView(m_bottomPane, m_timeRulerLayer);
+    m_document->addLayerToView(m_featurePane, m_timeRulerLayer);
     
     ColourDatabase *cdb = ColourDatabase::getInstance();
 
-    m_waveformLayer = qobject_cast<WaveformLayer *>
+    WaveformLayer *waveformLayer = qobject_cast<WaveformLayer *>
         (m_document->createLayer(LayerFactory::Waveform));
-    m_waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
+    waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
     
-    m_document->addLayerToView(m_bottomPane, m_waveformLayer);
-    m_document->setModel(m_waveformLayer, modelId);
+    m_document->addLayerToView(m_featurePane, waveformLayer);
+    m_document->setModel(waveformLayer, modelId);
 
-    m_spectrogramLayer = qobject_cast<SpectrogramLayer *>
+    SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
         (m_document->createLayer(LayerFactory::MelodicRangeSpectrogram));
-    m_spectrogramLayer->setBinScale(BinScale::Linear);
-    m_spectrogramLayer->setColourMap(ColourMapper::Green);
-    m_spectrogramLayer->setColourScale(ColourScaleType::Log);
-    m_spectrogramLayer->setColourScaleMultiple(2.0);
+    spectrogramLayer->setBinScale(BinScale::Linear);
+    spectrogramLayer->setColourMap(ColourMapper::Green);
+    spectrogramLayer->setColourScale(ColourScaleType::Log);
+    spectrogramLayer->setColourScaleMultiple(2.0);
 
-    m_document->addLayerToView(m_topPane, m_spectrogramLayer);
-    m_document->setModel(m_spectrogramLayer, modelId);
+    m_document->addLayerToView(m_audioPanes[0], spectrogramLayer);
+    m_document->setModel(spectrogramLayer, modelId);
+}
+
+ModelId
+Session::getAudioModelFromPane(Pane *pane)
+{
+    if (!pane) {
+        return {};
+    }
+    
+    int n = pane->getLayerCount();
+
+    for (int i = 0; i < n; ++i) {
+
+        auto layer = pane->getLayer(i);
+
+        auto waveformLayer = qobject_cast<WaveformLayer *>(layer);
+        if (waveformLayer) {
+            return waveformLayer->getModel();
+        }
+        
+        auto spectrogramLayer = qobject_cast<SpectrogramLayer *>(layer);
+        if (spectrogramLayer) {
+            return spectrogramLayer->getModel();
+        }
+    }
+
+    return {};
+}
+
+TimeInstantLayer *
+Session::getOnsetsLayerFromPane(Pane *pane, OnsetsLayerSelection selection)
+{
+    if (!pane) {
+        return nullptr;
+    }
+    
+    int n = pane->getLayerCount();
+
+    // Prefer topmost non-dormant layer if more than one matches the
+    // selection
+
+    vector<TimeInstantLayer *> candidates;
+    
+    for (int i = n-1; i >= 0; --i) {
+        auto layer = qobject_cast<TimeInstantLayer *>(pane->getLayer(i));
+        if (!layer) {
+            continue;
+        }
+        if (layer == m_pendingOnsetsLayer &&
+            selection != OnsetsLayerSelection::PermitPendingOnsets) {
+            continue;
+        }
+        candidates.push_back(layer);
+    }
+
+    TimeInstantLayer *any = nullptr;
+    TimeInstantLayer *nonDormant = nullptr;
+    
+    for (auto layer : candidates) {
+        if (!layer->isLayerDormant(pane)) {
+            if (!nonDormant) {
+                nonDormant = layer;
+            }
+        }
+        if (!any) {
+            any = layer;
+        }
+    }
+
+    if (nonDormant) {
+        return nonDormant;
+    } else {
+        return any;
+    }
+}
+
+void
+Session::addFurtherAudioPane(Pane *audioPane)
+{
+    m_audioPanes.push_back(audioPane);
+
+    ModelId modelId = getAudioModelFromPane(audioPane);
+
+    if (modelId.isNone()) {
+        SVDEBUG << "Session::addAudioPane: WARNING: Unable to retrieve audio model from pane" << endl;
+        return;
+    }
+
+    SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
+        (m_document->createLayer(LayerFactory::MelodicRangeSpectrogram));
+    spectrogramLayer->setBinScale(BinScale::Linear);
+    spectrogramLayer->setColourMap(ColourMapper::Green);
+    spectrogramLayer->setColourScale(ColourScaleType::Log);
+    spectrogramLayer->setColourScaleMultiple(2.0);
+
+    m_document->addLayerToView(audioPane, spectrogramLayer);
+    m_document->setModel(spectrogramLayer, modelId);
+}
+
+void
+Session::setActivePane(Pane *pane)
+{
+    m_activePane = pane;
+}
+
+ModelId
+Session::getActiveAudioModel()
+{
+    if (m_activePane) {
+
+        // Check against the audio panes, because it might not be one
+        for (auto p: m_audioPanes) {
+            if (m_activePane == p) {
+                auto modelId = getAudioModelFromPane(p);
+                SVDEBUG << "Session::getActiveAudioModel: Returning model "
+                        << modelId << " from active pane " << p << endl;
+                return modelId;
+            }
+        }
+
+        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
+                << m_mainModel << " as active pane is not an audio one" << endl;
+        return m_mainModel;
+    }
+
+    if (m_audioPanes.empty()) {
+        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
+                << m_mainModel << " as we have no active pane" << endl;
+        return m_mainModel;
+    } else {
+        auto modelId = getAudioModelFromPane(m_audioPanes[0]);
+        SVDEBUG << "Session::getActiveAudioModel: Returning model "
+                << modelId << " from first pane " << m_audioPanes[0] << endl;
+        return modelId;
+    }
+}
+
+Pane *
+Session::getAudioPaneForAudioModel(ModelId modelId)
+{
+    if (modelId.isNone()) {
+        return nullptr;
+    }
+            
+    for (auto pane : m_audioPanes) {
+
+        int n = pane->getLayerCount();
+
+        for (int i = 0; i < n; ++i) {
+
+            auto layer = pane->getLayer(i);
+
+            auto waveformLayer = qobject_cast<WaveformLayer *>(layer);
+            if (waveformLayer && waveformLayer->getModel() == modelId) {
+                return pane;
+            }
+        
+            auto spectrogramLayer = qobject_cast<SpectrogramLayer *>(layer);
+            if (spectrogramLayer && spectrogramLayer->getModel() == modelId) {
+                return pane;
+            }
+        }
+    }
+
+    return nullptr;
 }
 
 void
@@ -164,11 +330,6 @@ Session::setAlignmentTransformId(TransformId alignmentTransformId)
 void
 Session::beginAlignment()
 {
-    if (m_mainModel.isNone()) {
-        SVDEBUG << "Session::beginAlignment: WARNING: No main model; one should have been set first" << endl;
-        return;
-    }
-
     beginPartialAlignment(-1, -1, -1, -1, -1, -1);
 }
 
@@ -181,11 +342,23 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
                                sv_frame_t audioFrameEnd)
 {
     if (m_mainModel.isNone()) {
-        SVDEBUG << "Session::beginPartialAlignment: WARNING: No main model; one should have been set first" << endl;
+        SVDEBUG << "Session::beginPartialAlignment: ERROR: No main model; one should have been set first" << endl;
+        return;
+    }
+    if (m_audioPanes.empty()) {
+        SVDEBUG << "Session::beginPartialAlignment: ERROR: No audio panes" << endl;
         return;
     }
 
-    ModelTransformer::Input input(m_mainModel);
+    ModelId activeModelId = getActiveAudioModel();
+    Pane *activeAudioPane = getAudioPaneForAudioModel(activeModelId);
+
+    if (!activeAudioPane) {
+        SVDEBUG << "Session::beginPartialAlignment: ERROR: Failed to find audio pane for active model " << activeModelId << endl;
+        return;
+    }
+    
+    ModelTransformer::Input input(activeModelId);
 
     TransformId alignmentTransformId = m_alignmentTransformId;
     if (alignmentTransformId == "") {
@@ -201,13 +374,13 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     
     vector<pair<QString, pair<Pane *, TimeInstantLayer **>>> layerDefinitions {
         { alignmentTransformId,
-          { m_topPane, &m_pendingOnsetsLayer }
+          { activeAudioPane, &m_pendingOnsetsLayer }
         }
     };
 
     vector<Layer *> newLayers;
 
-    sv_samplerate_t sampleRate = ModelById::get(m_mainModel)->getSampleRate();
+    sv_samplerate_t sampleRate = ModelById::get(activeModelId)->getSampleRate();
     RealTime audioStart, audioEnd;
     if (audioFrameStart == -1) {
         audioStart = RealTime::fromSeconds(-1.0);
@@ -227,6 +400,17 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
             << scorePositionEndDenominator
             << ", audio start = " << audioStart << ", end = "
             << audioEnd << endl;
+
+    // Hide the existing layers
+
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (activeAudioPane, OnsetsLayerSelection::ExcludePendingOnsets);
+    if (onsetsLayer) {
+        onsetsLayer->showLayer(activeAudioPane, false);
+    }
+    if (m_tempoLayer) {
+        m_featurePane->removeLayer(m_tempoLayer);
+    }
     
     Transform::ParameterMap params {
         { "score-position-start-numerator", scorePositionStartNumerator },
@@ -303,26 +487,13 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
                     this, SLOT(modelReady(ModelId)));
         }
     }
-
-    // Hide the existing layers. This is only a temporary method of
-    // removing them, normally we would go through the document if we
-    // wanted to delete them entirely
-    if (m_displayedOnsetsLayer) {
-        m_acceptedOnsetsLayer = m_displayedOnsetsLayer;
-        m_topPane->removeLayer(m_displayedOnsetsLayer);
-    }
-    if (m_tempoLayer) {
-        m_bottomPane->removeLayer(m_tempoLayer);
-    }
         
-    m_displayedOnsetsLayer = m_pendingOnsetsLayer;
-
     setOnsetsLayerProperties(m_pendingOnsetsLayer);
 
     m_partialAlignmentAudioStart = audioFrameStart;
     m_partialAlignmentAudioEnd = audioFrameEnd;
     
-    m_awaitingOnsetsLayer = true;
+    m_audioModelForPendingOnsets = activeModelId;
 }
 
 void
@@ -347,10 +518,6 @@ Session::modelReady(ModelId id)
     SVDEBUG << "Session::modelReady: model is " << id << endl;
 
     if (m_pendingOnsetsLayer && id == m_pendingOnsetsLayer->getModel()) {
-        m_awaitingOnsetsLayer = false;
-    }
-
-    if (!m_awaitingOnsetsLayer) {
         alignmentComplete();
     }
 }
@@ -360,10 +527,15 @@ Session::modelChanged(ModelId id)
 {
     SVDEBUG << "Session::modelChanged: model is " << id << endl;
 
-    if (m_displayedOnsetsLayer && id == m_displayedOnsetsLayer->getModel()) {
+    auto mainOnsetsLayer = getOnsetsLayerFromPane
+        (getAudioPaneForAudioModel(m_mainModel),
+         OnsetsLayerSelection::PermitPendingOnsets);
+    
+    if (mainOnsetsLayer && id == mainOnsetsLayer->getModel()) {
         recalculateTempoLayer();
-        emit alignmentModified();
     }
+
+    emit alignmentModified();
 }
 
 void
@@ -372,7 +544,7 @@ Session::alignmentComplete()
     SVDEBUG << "Session::alignmentComplete" << endl;
 
     if (m_tempoLayer) {
-        m_bottomPane->addLayer(m_tempoLayer);
+        m_featurePane->addLayer(m_tempoLayer);
     }
 
     recalculateTempoLayer();
@@ -390,17 +562,20 @@ Session::rejectAlignment()
         SVDEBUG << "Session::rejectAlignment: No alignment waiting to be rejected" << endl;
         return;
     }        
-    
-    m_document->deleteLayer(m_pendingOnsetsLayer, true);
-    m_pendingOnsetsLayer = nullptr;
 
-    if (m_acceptedOnsetsLayer) {
-        m_topPane->addLayer(m_acceptedOnsetsLayer);
-        m_displayedOnsetsLayer = m_acceptedOnsetsLayer;
-        m_acceptedOnsetsLayer = nullptr;
-    } else {
-        m_displayedOnsetsLayer = nullptr;
+    m_document->deleteLayer(m_pendingOnsetsLayer, true);
+
+    if (!m_audioModelForPendingOnsets.isNone()) {
+        auto pane = getAudioPaneForAudioModel(m_audioModelForPendingOnsets);
+        auto previousOnsets = getOnsetsLayerFromPane
+            (pane, OnsetsLayerSelection::ExcludePendingOnsets);
+        if (previousOnsets) {
+            previousOnsets->showLayer(pane, true);
+        }
     }
+
+    m_pendingOnsetsLayer = nullptr;
+    m_audioModelForPendingOnsets = {};
 
     recalculateTempoLayer();
     updateOnsetColours();
@@ -413,30 +588,33 @@ Session::acceptAlignment()
 {
     SVDEBUG << "Session::acceptAlignment" << endl;
     
-    if (!m_pendingOnsetsLayer) {
+    if (!m_pendingOnsetsLayer || m_audioModelForPendingOnsets.isNone()) {
         SVDEBUG << "Session::acceptAlignment: No alignment waiting to be accepted" << endl;
         return;
     }        
-        
-    if (m_acceptedOnsetsLayer && m_partialAlignmentAudioEnd >= 0) {
-        mergeLayers(m_acceptedOnsetsLayer, m_pendingOnsetsLayer,
+
+    auto pane = getAudioPaneForAudioModel(m_audioModelForPendingOnsets);
+    auto previousOnsets = getOnsetsLayerFromPane
+        (pane, OnsetsLayerSelection::ExcludePendingOnsets);
+    
+    if (previousOnsets && m_partialAlignmentAudioEnd >= 0) {
+        mergeLayers(previousOnsets, m_pendingOnsetsLayer,
                     m_partialAlignmentAudioStart, m_partialAlignmentAudioEnd);
     }
     
-    if (m_acceptedOnsetsLayer) {
-        m_document->deleteLayer(m_acceptedOnsetsLayer, true);
-        m_acceptedOnsetsLayer = nullptr;
+    if (previousOnsets) {
+        m_document->deleteLayer(previousOnsets, true);
     }
-    m_displayedOnsetsLayer = m_pendingOnsetsLayer;
+
+    connect(ModelById::get(m_pendingOnsetsLayer->getModel()).get(),
+            SIGNAL(modelChanged(ModelId)), this, SLOT(modelChanged(ModelId)));
+    
     m_pendingOnsetsLayer = nullptr;
     
     recalculateTempoLayer();
     updateOnsetColours();
     
     emit alignmentAccepted();
-
-    connect(ModelById::get(m_displayedOnsetsLayer->getModel()).get(),
-            SIGNAL(modelChanged(ModelId)), this, SLOT(modelChanged(ModelId)));
 }
 
 void
@@ -483,7 +661,9 @@ Session::exportAlignmentTo(QString path)
     }
     
     bool success = updateAlignmentEntries();
-    if (success)    success = exportAlignmentEntriesTo(path);
+    if (success) {
+        success = exportAlignmentEntriesTo(path);
+    }
     return success;
 }
 
@@ -605,15 +785,25 @@ Session::importAlignmentFrom(QString path)
         return false;
     }
 
-    if (!m_displayedOnsetsLayer) {
-        m_displayedOnsetsLayer = dynamic_cast<TimeInstantLayer *>
+    auto pane = getAudioPaneForAudioModel(m_mainModel); //!!! or other model?
+    if (!pane) {
+        SVDEBUG << "Session::importAlignmentFrom: No audio pane for model "
+                << m_mainModel << endl;
+        return false;
+    }
+    
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (pane, OnsetsLayerSelection::ExcludePendingOnsets);
+    
+    if (!onsetsLayer) {
+        onsetsLayer = dynamic_cast<TimeInstantLayer *>
             (m_document->createEmptyLayer(LayerFactory::TimeInstants));
-        m_document->addLayerToView(m_topPane, m_displayedOnsetsLayer);
-        setOnsetsLayerProperties(m_displayedOnsetsLayer);
+        m_document->addLayerToView(pane, onsetsLayer);
+        setOnsetsLayerProperties(onsetsLayer);
     }
     
     auto existingModel = ModelById::getAs<SparseOneDimensionalModel>
-        (m_displayedOnsetsLayer->getModel());
+        (onsetsLayer->getModel());
     if (!existingModel) {
         SVDEBUG << "Session::importAlignmentFrom: Internal error: onsets layer has no model!" << endl;
         delete imported;
@@ -667,11 +857,22 @@ Session::resetAlignmentEntries()
 bool
 Session::updateAlignmentEntries()
 {
-    if (m_displayedOnsetsLayer) {
+    auto pane = getAudioPaneForAudioModel(m_mainModel);
+
+    if (!pane) {
+        SVDEBUG << "Session::importAlignmentFrom: No audio pane for model "
+                << m_mainModel << endl;
+        return false;
+    }
+    
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (pane, OnsetsLayerSelection::ExcludePendingOnsets);
+
+    if (onsetsLayer) {
 
         shared_ptr<SparseOneDimensionalModel> model =
                 ModelById::getAs<SparseOneDimensionalModel>
-            (m_displayedOnsetsLayer->getModel());
+            (onsetsLayer->getModel());
         
         if (model) {
 
@@ -683,12 +884,15 @@ Session::updateAlignmentEntries()
                 bool found = false;
                 int i = 0;
                 while (!found && i < int(m_alignmentEntries.size())) {
-                    if (m_alignmentEntries[i].label == target) found = true;
-                    else    i++;
+                    if (m_alignmentEntries[i].label == target) {
+                        found = true;
+                    } else {
+                        i++;
+                    }
                 }
                 if (!found) {
-                    SVCERR<<"ERROR: In Session::updateAlignmentEntries, label "
-                          << target << " not found!"<<endl;
+                    SVCERR << "ERROR: In Session::updateAlignmentEntries, label "
+                           << target << " not found!" << endl;
                     return false;
                 }
                 m_alignmentEntries[i].frame = onset.getFrame();
@@ -713,10 +917,20 @@ Session::recalculateTempoLayer()
             (m_document->createLayer(LayerFactory::TimeValues));
         ColourDatabase *cdb = ColourDatabase::getInstance();
         m_tempoLayer->setBaseColour(cdb->getColourIndex(tr("Blue")));
-        m_document->addLayerToView(m_bottomPane, m_tempoLayer);
+        m_document->addLayerToView(m_featurePane, m_tempoLayer);
     }
 
-    if (!m_displayedOnsetsLayer) {
+    auto audioPane = getAudioPaneForAudioModel(m_mainModel);
+    if (!audioPane) {
+        SVDEBUG << "Session::recalculateTempoLayer: No audio pane for model "
+                << m_mainModel << endl;
+        return;
+    }
+    
+    auto onsetsLayer = getOnsetsLayerFromPane
+        (audioPane, OnsetsLayerSelection::PermitPendingOnsets);
+
+    if (!onsetsLayer) {
         m_document->setModel(m_tempoLayer, newModelId);
         return;
     }
@@ -762,22 +976,32 @@ Session::recalculateTempoLayer()
 void
 Session::updateOnsetColours()
 {
-    if (!m_displayedOnsetsLayer) {
-        return;
-    }
-    
-    QString colour;
+    for (auto pane : m_audioPanes) {
 
-    if (m_pendingOnsetsLayer) {
-        colour = "Bright Red";
-    } else if (m_inEditMode) {
-        colour = "Orange";
-    } else {
-        colour = "Purple";
-    }
+        auto onsetsLayer = getOnsetsLayerFromPane
+            (pane, OnsetsLayerSelection::PermitPendingOnsets);
+
+        if (!onsetsLayer) {
+            continue;
+        }
+
+        bool isPending =
+            (m_pendingOnsetsLayer &&
+             pane == getAudioPaneForAudioModel(m_audioModelForPendingOnsets));
+        
+        QString colour;
+
+        if (isPending) {
+            colour = "Bright Red";
+        } else if (m_inEditMode) {
+            colour = "Orange";
+        } else {
+            colour = "Purple";
+        }
     
-    ColourDatabase *cdb = ColourDatabase::getInstance();
-    m_displayedOnsetsLayer->setBaseColour(cdb->getColourIndex(colour));
+        ColourDatabase *cdb = ColourDatabase::getInstance();
+        onsetsLayer->setBaseColour(cdb->getColourIndex(colour));
+    }
 }
 
 
