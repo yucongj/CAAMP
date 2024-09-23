@@ -1,7 +1,7 @@
 /* -*- c-basic-offset: 4 indent-tabs-mode: nil -*-  vi:set ts=8 sts=4 sw=4: */
 
 /*
-    SV Piano Precision
+    Performance Precision
     
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License as
@@ -25,7 +25,7 @@
 
 #include "data/model/Model.h"
 
-#include "piano-precision-aligner/Score.h"
+#include "piano-aligner/Score.h"
 
 class Session : public QObject
 {

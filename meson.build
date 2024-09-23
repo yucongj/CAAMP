@@ -1,6 +1,6 @@
 
 project(
-  'Piano Precision',
+  'Performance Precision',
   'c', 'cpp',
   version: '1.1.0',
   license: 'GPL-2.0-or-later',
@@ -184,7 +184,7 @@ if system == 'linux'
   ]
   
   vamp_symbol_args += [
-    '-Wl,--version-script=' + meson.current_source_dir() / 'piano-precision-aligner/vamp-plugin.map'
+    '-Wl,--version-script=' + meson.current_source_dir() / 'piano-aligner/vamp-plugin.map'
   ]
   
 elif system == 'darwin'
@@ -325,7 +325,7 @@ elif system == 'darwin'
   endif
   
   vamp_symbol_args += [
-    '-exported_symbols_list', meson.current_source_dir() / 'piano-precision-aligner/vamp-plugin.list'
+    '-exported_symbols_list', meson.current_source_dir() / 'piano-aligner/vamp-plugin.list'
   ]
   
 elif system == 'windows'
@@ -347,7 +347,7 @@ elif system == 'windows'
   capnp_cpp_plugin = svdeps_dir / 'bin/capnpc-c++'
 
   windows = import('windows')
-  rc = windows.compile_resources('icons/piano-precision.rc')
+  rc = windows.compile_resources('icons/performance-precision.rc')
 
   general_defines += [
     '-DWIN32',
@@ -1091,7 +1091,7 @@ pp_main_files = [
   'main/ScoreParser.cpp',
   'main/ScoreWidget.cpp',
   'main/vrvtrim.cpp',
-  'piano-precision-aligner/Score.cpp',
+  'piano-aligner/Score.cpp',
 ]
 
 verovio_files = [
@@ -1448,13 +1448,13 @@ checker_lib_files = [
 ]
 
 ppa_files = [
-  'piano-precision-aligner/AudioToScoreAligner.cpp',
-  'piano-precision-aligner/PianoAligner.cpp',
-  'piano-precision-aligner/Score.cpp',
-  'piano-precision-aligner/SimpleHMM.cpp',
-  'piano-precision-aligner/Templates.cpp',
-  'piano-precision-aligner/Paths.cpp',
-  'piano-precision-aligner/plugins.cpp',
+  'piano-aligner/AudioToScoreAligner.cpp',
+  'piano-aligner/PianoAligner.cpp',
+  'piano-aligner/Score.cpp',
+  'piano-aligner/SimpleHMM.cpp',
+  'piano-aligner/Templates.cpp',
+  'piano-aligner/Paths.cpp',
+  'piano-aligner/plugins.cpp',
 ]
 
 dummy_files = [
@@ -1510,7 +1510,7 @@ dummy_plugin = shared_library(
 
 qt_resource_files = qt.preprocess(
   qresources: [
-  'piano-precision.qrc',
+  'performance-precision.qrc',
 ])
 
 if compiler == 'msvc'
@@ -1545,13 +1545,13 @@ else
 endif
 
 if system == 'linux'
-  pp_main_name = 'piano-precision'
+  pp_main_name = 'performance-precision'
 else
-  pp_main_name = 'Piano Precision'
+  pp_main_name = 'Performance Precision'
 endif # system
 
 install_data(
-  'piano-precision.desktop',
+  'performance-precision.desktop',
   install_dir : get_option('datadir') / 'applications',
 )
 

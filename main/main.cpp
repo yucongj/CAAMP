@@ -30,7 +30,7 @@
 #include "plugin/PluginScan.h"
 #include "plugin/PluginPathSetter.h"
 
-#include "piano-precision-aligner/Score.h" // for Fraction type
+#include "piano-aligner/Score.h" // for Fraction type
 
 #include <QMetaType>
 #include <QApplication>
@@ -319,7 +319,7 @@ main(int argc, char **argv)
 
     QApplication::setOrganizationName("sonic-visualiser");
     QApplication::setOrganizationDomain("sonicvisualiser.org");
-    QApplication::setApplicationName(QApplication::tr("Piano Precision")); // Oct 5, 2021: Yucong Jiang
+    QApplication::setApplicationName(QApplication::tr("Performance Precision"));
     QApplication::setApplicationVersion(SV_VERSION);
 
 #if (QT_VERSION >= 0x050700)
@@ -443,7 +443,7 @@ main(int argc, char **argv)
     }
     settings.endGroup();
 
-    //!!! For Piano Precision, until it has its own splash image
+    //!!! For Performance Precision, until it has its own splash image
     showSplash = false;
     
     if (showSplash) {

@@ -22,7 +22,7 @@
 #include "ScoreParser.h"
 #include "ScoreAlignmentTransform.h"
 #include "Session.h"
-#include "piano-precision-aligner/Score.h"
+#include "piano-aligner/Score.h"
 
 #include "view/Pane.h"
 #include "view/PaneStack.h"
@@ -223,7 +223,7 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
 
     SVDEBUG << "MainWindow: Creating main user interface layout" << endl;
 
-    // For Piano Precision, we want to constrain playback to selection
+    // For Performance Precision, we want to constrain playback to selection
     // by default, and we don't want to play multiple recordings at once
     m_viewManager->setPlaySelectionMode(true);
     m_viewManager->setPlaySoloMode(true);
@@ -1263,7 +1263,7 @@ MainWindow::setupViewMenu()
 
     m_keyReference->setCategory(tr("Display Features"));
 
-    // For Piano Precision
+    // For Performance Precision
     m_viewManager->setShowCentreLine(false);
     
     action = new QAction(tr("Show &Centre Line"), this);
@@ -6550,28 +6550,28 @@ MainWindow::introduction()
 {
 #ifdef Q_OS_WIN32
     QString introText =
-        "<h3>How to use Piano Precision</h3>"
+        "<h3>How to use Performance Precision</h3>"
         "<p><i>You can open this instruction page at any time from the Help menu.</i><p>"
-        "<p>This is a software tool that assists in analyzing recorded piano performances together with their scores.</p>"
+        "<p>This is a software tool that assists in analyzing recorded performances together with their scores.</p>"
         "<p>The controls you'll need for loading a score and loading a recording are located at the top-left corner of the application."
         "<ol><li>First, you'll need to load an MEI score using the musical-note tool button.</li>"
         "<li>Then, you can load a performance (audio) recording of that score using the tool button next to it.</li>"
         "<li>Underneath the score area, you can find controls for synchronizing the score with the audio.</li></ol>"
-        "<p>If you don't have your own MEI scores or recordings yet, you can use our samples located in the folder called <code>PianoPrecision</code> within your Documents folder:"
+        "<p>If you don't have your own MEI scores or recordings yet, you can use our samples located in the folder called <code>PerformancePrecision</code> within your Documents folder:"
         "<ul><li>Beethoven Sonata Op. 110 Movement I</li>"
         "<li>J. S. Bach Fugue in C Major, BWV 846</li>"
         "<li>Mozart Sonata No. 18 Movement II</li>"
         "<li>Schubert Impromptu Op. 90 No. 1</li><br></ul>";
 #else // !Q_OS_WIN32
     QString introText =
-        "<h3>How to use Piano Precision</h3>"
+        "<h3>How to use Performance Precision</h3>"
         "<p><i>You can open this instruction page at any time from the Help menu.</i><p>"
-        "<p>This is a software tool that assists in analyzing recorded piano performances together with their scores.</p>"
+        "<p>This is a software tool that assists in analyzing recorded performances together with their scores.</p>"
         "<p>The controls you'll need for loading a score and loading a recording are located at the top-left corner of the application."
         "<br><img src=\":icons/scalable/blank.svg\" width=%2 height=%1>1. First, you'll need to load an MEI score using <img src=\":icons/scalable/chooseScore.svg\" width=%1 height=%1>."
         "<br><img src=\":icons/scalable/blank.svg\" width=%2 height=%1>2. Then, you can load a performance (audio) recording of that score using <img src=\":icons/scalable/fileopenaudio.svg\" width=%1 height=%1>."
         "<br><img src=\":icons/scalable/blank.svg\" width=%2 height=%1>3. Underneath the score area, you can find controls for synchronizing the score with the audio.</p>"
-        "<p>If you don't have your own MEI scores or recordings yet, you can use our samples located in the folder called <code>PianoPrecision</code> within your Documents folder:"
+        "<p>If you don't have your own MEI scores or recordings yet, you can use our samples located in the folder called <code>PerformancePrecision</code> within your Documents folder:"
         "<br><img src=\":icons/scalable/blank.svg\" width=%2 height=%1>&bull; Beethoven Sonata Op. 110 Movement I"
         "<br><img src=\":icons/scalable/blank.svg\" width=%2 height=%1>&bull; J. S. Bach Fugue in C Major, BWV 846"
         "<br><img src=\":icons/scalable/blank.svg\" width=%2 height=%1>&bull; Mozart Sonata No. 18 Movement II"
@@ -6627,8 +6627,8 @@ MainWindow::about()
 {
     QString aboutText;
 
-    aboutText += tr("<h3>About Piano Precision</h3>");
-    aboutText += tr("<p>Piano Precision is a program that assists analysis of recorded piano performances alongside their scores.<br><a href=\"https://github.com/yucongj/piano-precision/\">https://github.com/yucongj/piano-precision/</a></p><p>Piano Precision is based on Sonic Visualiser:<br><a href=\"https://www.sonicvisualiser.org/\">https://www.sonicvisualiser.org/</a></p>");
+    aboutText += tr("<h3>About Performance Precision</h3>");
+    aboutText += tr("<p>Performance Precision is a program that assists analysis of recorded performances alongside their scores.<br><a href=\"https://github.com/yucongj/caamp/\">https://github.com/yucongj/caamp/</a></p><p>Performance Precision is based on Sonic Visualiser:<br><a href=\"https://www.sonicvisualiser.org/\">https://www.sonicvisualiser.org/</a></p>");
     aboutText += QString("<p><small>%1</small></p>").arg(getReleaseText());
 
     if (m_oscQueue && m_oscQueue->isOK()) {
@@ -6737,7 +6737,7 @@ MainWindow::about()
     aboutText += "</small></p>";
 
     aboutText += 
-        "<p><small>Piano Precision is Copyright &copy; 2005&ndash;2007 Chris Cannam; Copyright &copy; 2006&ndash;2020 Queen Mary, University of London; Copyright &copy; 2020-2023 Particular Programs Ltd; Copyright &copy; 2021-2023 Yucong Jiang.</small></p>";
+        "<p><small>Performance Precision is Copyright &copy; 2005&ndash;2007 Chris Cannam; Copyright &copy; 2006&ndash;2024 Queen Mary, University of London; Copyright &copy; 2020-2024 Particular Programs Ltd; Copyright &copy; 2021-2024 Yucong Jiang.</small></p>";
 
     aboutText +=
         "<p><small>This program is free software; you can redistribute it and/or "

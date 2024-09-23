@@ -24,5 +24,5 @@ jobs:
         QTDIR=/opt/homebrew ./deploy/macos/deploy.sh build
     - name: check
       run: |
-        otool -L ./"Piano Precision.app/Contents/MacOS/Piano Precision"
-        ./"Piano Precision.app/Contents/MacOS/Piano Precision" --version
+        otool -L ./"Performance Precision.app/Contents/MacOS/Performance Precision"
+        ./"Performance Precision.app/Contents/MacOS/Performance Precision" --version
