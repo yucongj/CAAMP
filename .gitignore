@@ -50,6 +50,7 @@ vamp-plugin-load-checker
 piper-vamp-simple-server
 piper-convert
 piano-precision-aligner
+piano-aligner
 *.msi
 *.user
 .vext*
@@ -67,5 +68,6 @@ squashfs-root
 .notarization-status
 *.dmg
 deploy/win64/piano-precision.wxs
+deploy/win64/performance-precision.wxs
 *.stackdump
 verovio

@@ -24,7 +24,7 @@
 
 #include "ScoreWidget.h"
 #include "Session.h"
-#include "piano-precision-aligner/Score.h"
+#include "piano-aligner/Score.h"
 
 class QFileSystemWatcher;
 class QScrollArea;

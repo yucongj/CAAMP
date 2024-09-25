@@ -51,11 +51,11 @@
     "bqthingfactory": {
       "pin": "2e4bd170f57f"
     },
-    "piano-precision-aligner": {
-      "pin": "ea967162dcc582a8354d4b8a6ae3b3a2a914589d"
-    },
     "dummy-score-aligner": {
       "pin": "0d39744a7a7e63471e0219e8287d5c1a564de7f5"
+    },
+    "piano-aligner": {
+      "pin": "3b1500314e36aa73bc37587bcfee056c799794cb"
     }
   }
 }

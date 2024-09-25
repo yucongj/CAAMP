@@ -1,7 +1,7 @@
 /* -*- c-basic-offset: 4 indent-tabs-mode: nil -*-  vi:set ts=8 sts=4 sw=4: */
 
 /*
-    SV Piano Precision
+    Performance Precision
     
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License as
@@ -29,7 +29,7 @@ string
 ScoreFinder::getUserScoreDirectory()
 {
     QString home = QDir::homePath();
-    std::filesystem::path dir = home.toStdString() + "/Documents/PianoPrecision/Scores";
+    std::filesystem::path dir = home.toStdString() + "/Documents/PerformancePrecision/Scores";
     if (!std::filesystem::exists(dir)) {
         SVDEBUG << "ScoreFinder::getUserScoreDirectory: Score directory "
                 << dir.string() << " does not exist, attempting to create it"
@@ -195,7 +195,7 @@ ScoreFinder::getUserRecordingDirectory(string scoreName, bool create)
 {
     QString home = QDir::homePath();
     std::filesystem::path dir = home.toStdString() +
-        "/Documents/PianoPrecision/Recordings/" + scoreName;
+        "/Documents/PerformancePrecision/Recordings/" + scoreName;
     if (!std::filesystem::exists(dir)) {
         if (create) {
             std::error_code errorCode;

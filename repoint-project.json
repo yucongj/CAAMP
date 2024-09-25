@@ -97,7 +97,7 @@
             "service": "sourcehut",
             "owner": "breakfastquay"
         },
-	"piano-precision-aligner": {
+	"piano-aligner": {
             "vcs": "git",
             "service": "github",
             "owner": "yucongj",
