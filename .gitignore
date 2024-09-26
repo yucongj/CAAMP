@@ -71,3 +71,4 @@ deploy/win64/piano-precision.wxs
 deploy/win64/performance-precision.wxs
 *.stackdump
 verovio
+dummy-score-aligner
