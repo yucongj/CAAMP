@@ -49,6 +49,8 @@ public:
     sv::TimeValueLayer *getTempoLayer();
     sv::Pane *getPaneContainingTempoLayer();
 
+    QString getActiveAudioTitle() const;
+    
     bool exportAlignmentTo(QString filename);
     bool importAlignmentFrom(QString filename);
 
@@ -122,16 +124,16 @@ private:
 
     bool m_inEditMode;
 
-    sv::ModelId getActiveAudioModel();
-    sv::ModelId getAudioModelFromPane(sv::Pane *);
-    sv::Pane *getAudioPaneForAudioModel(sv::ModelId);
+    sv::ModelId getActiveAudioModel() const;
+    sv::ModelId getAudioModelFromPane(sv::Pane *) const;
+    sv::Pane *getAudioPaneForAudioModel(sv::ModelId) const;
 
     enum class OnsetsLayerSelection {
         PermitPendingOnsets,
         ExcludePendingOnsets
     };
     sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *,
-                                                 OnsetsLayerSelection);
+                                                 OnsetsLayerSelection) const;
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();

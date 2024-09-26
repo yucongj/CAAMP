@@ -155,7 +155,7 @@ Session::setMainModel(ModelId modelId, QString scoreId)
 }
 
 ModelId
-Session::getAudioModelFromPane(Pane *pane)
+Session::getAudioModelFromPane(Pane *pane) const
 {
     if (!pane) {
         return {};
@@ -182,7 +182,7 @@ Session::getAudioModelFromPane(Pane *pane)
 }
 
 TimeInstantLayer *
-Session::getOnsetsLayerFromPane(Pane *pane, OnsetsLayerSelection selection)
+Session::getOnsetsLayerFromPane(Pane *pane, OnsetsLayerSelection selection) const
 {
     if (!pane) {
         return nullptr;
@@ -257,8 +257,20 @@ Session::setActivePane(Pane *pane)
     m_activePane = pane;
 }
 
+QString
+Session::getActiveAudioTitle() const
+{
+    auto modelId = getActiveAudioModel();
+    auto model = ModelById::getAs<RangeSummarisableTimeValueModel>(modelId);
+    if (model) {
+        return model->getTitle();
+    } else {
+        return {};
+    }
+}    
+
 ModelId
-Session::getActiveAudioModel()
+Session::getActiveAudioModel() const
 {
     if (m_activePane) {
 
@@ -290,7 +302,7 @@ Session::getActiveAudioModel()
 }
 
 Pane *
-Session::getAudioPaneForAudioModel(ModelId modelId)
+Session::getAudioPaneForAudioModel(ModelId modelId) const
 {
     if (modelId.isNone()) {
         return nullptr;

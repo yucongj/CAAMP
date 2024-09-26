@@ -3610,26 +3610,20 @@ MainWindow::updateMenuStates()
 void
 MainWindow::updateWindowTitle()
 {
-    QString title;
-    
+    QString title = QApplication::applicationName();
+
     if (m_scoreId != "") {
-        if (m_originalLocation == "") {
-            title = tr("%1: %2")
-                .arg(QApplication::applicationName())
-                .arg(m_scoreId);
-        } else {
-            title = tr("%1: %2: %3")
-                .arg(QApplication::applicationName())
-                .arg(m_scoreId)
-                .arg(QFileInfo(m_originalLocation).completeBaseName());
-        }            
+        title += ": " + m_scoreId;
     }
 
-    if (title != "") {
-        setWindowTitle(title);
-    } else {
-        MainWindowBase::updateWindowTitle();
+    QString recordingTitle = m_session.getActiveAudioTitle();
+    if (recordingTitle != "") {
+        title += ": " + recordingTitle;
+    } else if (m_originalLocation != "") {
+        title += ": " + QFileInfo(m_originalLocation).completeBaseName();
     }
+
+    setWindowTitle(title);
 }
 
 void
@@ -5777,6 +5771,7 @@ MainWindow::currentPaneChanged(Pane *pane)
     }
 
     m_session.setActivePane(pane);
+    updateWindowTitle();
 }
 
 void
