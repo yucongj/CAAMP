@@ -76,6 +76,7 @@ protected slots:
     virtual void loadScoreAlignment();
     virtual void saveScoreAlignment();
     virtual void saveScoreAlignmentAs();
+    virtual void copyAlignmentFromReference();
     virtual void importLayer();
     virtual void exportLayer();
     virtual void exportImage();

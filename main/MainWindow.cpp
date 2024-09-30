@@ -23,6 +23,7 @@
 #include "ScoreAlignmentTransform.h"
 #include "Session.h"
 #include "piano-aligner/Score.h"
+#include "align/Align.h"
 
 #include "view/Pane.h"
 #include "view/PaneStack.h"
@@ -817,6 +818,10 @@ MainWindow::setupFileMenu()
     toolbar->addAction(action);
     menu->addAction(action);
 
+    action = new QAction(tr("(temporary alignment copying action)"), this);
+    connect(action, SIGNAL(triggered()), this, SLOT(copyAlignmentFromReference()));
+    menu->addAction(action);
+
     menu->addSeparator();
 
     action = new QAction(tr("Import Annotation &Layer..."), this);
@@ -834,7 +839,7 @@ MainWindow::setupFileMenu()
     connect(this, SIGNAL(canExportLayer(bool)), action, SLOT(setEnabled(bool)));
     m_keyReference->registerShortcut(action);
     menu->addAction(action);
-
+    
     menu->addSeparator();
     
     action = new QAction(tr("Convert Audio from Data File..."), this);
@@ -4128,6 +4133,25 @@ MainWindow::saveScoreAlignmentAs()
 }
 
 void
+MainWindow::copyAlignmentFromReference()
+{
+    ModelId audioModelId = m_session.getActiveAudioModel();
+    if (audioModelId.isNone()) {
+        SVDEBUG << "MainWindow::copyAlignmentFromReference: No active audio" << endl;
+        return;
+    }
+
+    if (audioModelId == getMainModelId()) {
+        SVDEBUG << "MainWindow::copyAlignmentFromReference: Active audio *is* reference" << endl;
+        return;
+    }
+
+    //!!! handle case where alignment is not yet complete (Model::getAlignmentCompletion)
+
+    m_session.propagateAlignmentFromMain();
+}
+
+void
 MainWindow::importLayer()
 {
     Pane *pane = m_paneStack->getCurrentPane();
@@ -4511,11 +4535,12 @@ MainWindow::documentReplaced()
 {
     SVDEBUG << "MainWindow::documentReplaced" << endl;
     
-    if (m_document) {
-        connect(m_document, SIGNAL(activity(QString)),
-                m_activityLog, SLOT(activityHappened(QString)));
-    }
+    connect(m_document, SIGNAL(activity(QString)),
+            m_activityLog, SLOT(activityHappened(QString)));
 
+    Align::setAlignmentPreference(Align::MATCHAlignmentWithPitchCompare);
+    m_document->setAutoAlignment(true); // for audio-to-audio alignment
+    
     Pane *topPane = m_paneStack->addPane();
     Pane *bottomPane = m_paneStack->addPane();
 

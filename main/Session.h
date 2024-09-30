@@ -49,6 +49,7 @@ public:
     sv::TimeValueLayer *getTempoLayer();
     sv::Pane *getPaneContainingTempoLayer();
 
+    sv::ModelId getActiveAudioModel() const;
     QString getActiveAudioTitle() const;
     
     bool exportAlignmentTo(QString filename);
@@ -80,6 +81,9 @@ public slots:
                                int scorePositionEndDenominator,
                                sv::sv_frame_t audioFrameStart,
                                sv::sv_frame_t audioFrameEnd);
+
+    void propagateAlignmentFromMain();
+    
     void acceptAlignment();
     void rejectAlignment();
 
@@ -124,7 +128,6 @@ private:
 
     bool m_inEditMode;
 
-    sv::ModelId getActiveAudioModel() const;
     sv::ModelId getAudioModelFromPane(sv::Pane *) const;
     sv::Pane *getAudioPaneForAudioModel(sv::ModelId) const;
 
