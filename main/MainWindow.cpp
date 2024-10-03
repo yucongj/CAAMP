@@ -152,6 +152,88 @@ using std::string;
 
 using namespace sv;
 
+class MainWindow::ScoreBasedFrameAligner : public View::PlaybackFrameAligner {
+public:
+    ScoreBasedFrameAligner(Session *session) : m_session(session) { }
+
+    sv_frame_t map(const View *forView, sv_frame_t frame) const override {
+
+        auto sourcePane = m_session->getPaneContainingOnsetsLayer();
+        if (forView == sourcePane) {
+            return frame;
+        }
+
+        Pane *targetPane =
+            const_cast<Pane *>(dynamic_cast<const Pane *>(forView));
+        auto targetLayer = m_session->getOnsetsLayerFromPane(targetPane);
+        if (!targetLayer) {
+            return frame;
+        }
+        
+        QString label = mapToScoreLabel(frame);
+
+        //!!! miserably slow
+        
+        ModelId targetId = targetLayer->getModel();
+        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
+        auto events = targetModel->getAllEvents();
+        int eventCount = targetModel->getEventCount();
+        for (int i = 0; i < eventCount; ++i) {
+            if (label == events[i].getLabel()) {
+                return events[i].getFrame();
+            }
+        }
+        
+        return frame;
+    }
+
+    QString mapToScoreLabel(sv_frame_t frame) const {
+
+        //!!! Much too slow - rework with search & cacheing
+        
+        // The default tempo is quarter note = 120 bpm.
+
+        QString label;
+        TimeInstantLayer *targetLayer = m_session->getOnsetsLayer();
+
+        if (!targetLayer) {
+            return label;
+        }
+        
+        ModelId targetId = targetLayer->getModel();
+        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
+        auto events = targetModel->getAllEvents();
+        if (events.empty()) {
+            return label;
+        }
+        
+        label = events[0].getLabel();
+        bool found = false;
+        int eventCount = targetModel->getEventCount();
+        for (int i = 1; i < eventCount; ++i) {
+            sv_frame_t eventFrame = events[i].getFrame();
+//            SVDEBUG << "MainWindow::highlightFrameInScore: seeking frame " << frame << ": event index = " << i << ": " << "Frame = " << eventFrame << ", Value = " << events[i].getValue() << ", Label = " << events[i].getLabel() << endl;
+            if (frame < eventFrame) {
+                label = events[i-1].getLabel();
+                found = true;
+                break;
+            } else if (frame == eventFrame) {
+                label = events[i].getLabel();
+                found = true;
+                break;
+            }
+        }
+        if (!found && eventCount > 0) {
+            label = events[eventCount-1].getLabel();
+        }
+
+        return label;
+    }
+
+private:
+    Session *m_session;
+};
+
 MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSupport) :
     MainWindowBase(audioMode, midiMode, int(PaneStack::Option::Default)),
     m_overview(nullptr),
@@ -193,7 +275,8 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_templateWatcher(nullptr),
     m_shouldStartOSCQueue(false),
     m_scoreAlignmentModified(false),
-    m_followScore(true)
+    m_followScore(true),
+    m_scoreBasedFrameAligner(new ScoreBasedFrameAligner(&m_session))
 {
     Profiler profiler("MainWindow::MainWindow");
 
@@ -546,6 +629,8 @@ MainWindow::~MainWindow()
 {
 //    SVDEBUG << "MainWindow::~MainWindow" << endl;
 
+    delete m_scoreBasedFrameAligner;
+    
     deleteTemporaryScoreFiles();
 
     delete m_keyReference;
@@ -2603,41 +2688,10 @@ MainWindow::viewManagerPlaybackFrameChanged(sv_frame_t frame)
 void
 MainWindow::highlightFrameInScore(sv_frame_t frame)
 {
-    // sv_samplerate_t rate = m_viewManager->getMainModelSampleRate();
-    // RealTime rt = RealTime::frame2RealTime(frame, rate);
-
-    // The default tempo is quarter note = 120 bpm.
-
-    TimeInstantLayer *targetLayer = m_session.getOnsetsLayer();
-
-    // If the program is slow, might want to consider a different approach that can get rid of the loops.
-    QString label;
-    if (targetLayer) {
-        ModelId targetId = targetLayer->getModel();
-        const auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
-        const auto events = targetModel->getAllEvents();
-        if (events.empty()) return;
-        label = events[0].getLabel();
-        bool found = false;
-        int eventCount = targetModel->getEventCount();
-        for (int i = 1; i < eventCount; ++i) {
-            sv_frame_t eventFrame = events[i].getFrame();
-//            SVDEBUG << "MainWindow::highlightFrameInScore: seeking frame " << frame << ": event index = " << i << ": " << "Frame = " << eventFrame << ", Value = " << events[i].getValue() << ", Label = " << events[i].getLabel() << endl;
-            if (frame < eventFrame) {
-                label = events[i-1].getLabel();
-                found = true;
-                break;
-            } else if (frame == eventFrame) {
-                label = events[i].getLabel();
-                found = true;
-                break;
-            }
-        }
-        if (!found && eventCount > 0) {
-            label = events[eventCount-1].getLabel();
-        }
+    QString label = m_scoreBasedFrameAligner->mapToScoreLabel(frame);
+    if (label == "") {
+        return;
     }
-
     m_scoreWidget->setHighlightEventByLabel(label.toStdString());
 }
 
@@ -4813,10 +4867,13 @@ MainWindow::manageSavedTemplates()
 void
 MainWindow::paneAdded(Pane *pane)
 {
-    if (m_overview) m_overview->registerView(pane);
+    if (m_overview) {
+        m_overview->registerView(pane);
+    }
     if (pane) {
         connect(pane, &Pane::cancelButtonPressed,
                 this, &MainWindow::paneCancelButtonPressed);
+        pane->setPlaybackFrameAligner(m_scoreBasedFrameAligner);
     }
 }    
 

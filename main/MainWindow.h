@@ -293,16 +293,16 @@ protected:
     QPointer<PreferencesDialog> m_preferencesDialog;
     QPointer<sv::LayerTreeDialog>   m_layerTreeDialog;
 
-    sv::ActivityLog             *m_activityLog;
-    sv::UnitConverter           *m_unitConverter;
-    sv::KeyReference            *m_keyReference;
+    sv::ActivityLog         *m_activityLog;
+    sv::UnitConverter       *m_unitConverter;
+    sv::KeyReference        *m_keyReference;
 
     QFileSystemWatcher      *m_templateWatcher;
 
     bool                     m_shouldStartOSCQueue;
     
     Surveyer                *m_surveyer;
-    sv::VersionTester           *m_versionTester;
+    sv::VersionTester       *m_versionTester;
     QString                  m_newerVersionIs;
 
     QString                  m_scoreId;
@@ -311,6 +311,9 @@ protected:
     QString                  m_scoreAlignmentFile;
     bool                     m_scoreAlignmentModified;
     bool                     m_followScore;
+
+    class ScoreBasedFrameAligner;
+    ScoreBasedFrameAligner  *m_scoreBasedFrameAligner;
 
     std::vector<std::string> m_scoreFilesToDelete;
     void deleteTemporaryScoreFiles();

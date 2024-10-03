@@ -182,6 +182,12 @@ Session::getAudioModelFromPane(Pane *pane) const
 }
 
 TimeInstantLayer *
+Session::getOnsetsLayerFromPane(Pane *pane) const
+{
+    return getOnsetsLayerFromPane(pane, OnsetsLayerSelection::PermitPendingOnsets);
+}
+
+TimeInstantLayer *
 Session::getOnsetsLayerFromPane(Pane *pane, OnsetsLayerSelection selection) const
 {
     if (!pane) {

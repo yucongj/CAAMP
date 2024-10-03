@@ -45,6 +45,7 @@ public:
 
     sv::TimeInstantLayer *getOnsetsLayer();
     sv::Pane *getPaneContainingOnsetsLayer();
+    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *pane) const;
     
     sv::TimeValueLayer *getTempoLayer();
     sv::Pane *getPaneContainingTempoLayer();
@@ -135,8 +136,8 @@ private:
         PermitPendingOnsets,
         ExcludePendingOnsets
     };
-    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *,
-                                                 OnsetsLayerSelection) const;
+    sv::TimeInstantLayer *getOnsetsLayerFromPane
+    (sv::Pane *, OnsetsLayerSelection) const;
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();
