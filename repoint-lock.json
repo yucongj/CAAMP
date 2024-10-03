@@ -4,7 +4,7 @@
       "pin": "63e0c3b37b6fb9ce6f074ea8222b4903e4f5568a"
     },
     "svcore": {
-      "pin": "9a6763ad2867f9f72ed0a86a3458b3cb1bc10a87"
+      "pin": "4350c53ab2a407f5d0048e6db81ac4e9c8e9a7ca"
     },
     "svgui": {
       "pin": "4534b055067b313157aaa31db3d3ce876f7fc086"
@@ -28,7 +28,7 @@
       "pin": "c6519fcb8c926c8331f5e6deb351d738da48600a"
     },
     "dataquay": {
-      "pin": "79623fb778da"
+      "pin": "3dbf25604e7a"
     },
     "verovio": {
       "pin": "c482e357cfbe42c76f41a37485740f66bcb39637"
@@ -46,13 +46,13 @@
       "pin": "88520ab5b8e5"
     },
     "bqaudiostream": {
-      "pin": "5d5950bc4d93"
+      "pin": "83c7942e4b3d"
     },
     "bqthingfactory": {
       "pin": "2e4bd170f57f"
     },
     "dummy-score-aligner": {
-      "pin": "0d39744a7a7e63471e0219e8287d5c1a564de7f5"
+      "pin": "489aba2ef9411dea17eb407aa7332ddc8152f960"
     },
     "piano-aligner": {
       "pin": "3b1500314e36aa73bc37587bcfee056c799794cb"
