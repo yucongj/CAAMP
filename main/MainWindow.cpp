@@ -156,8 +156,8 @@ class MainWindow::ScoreBasedFrameAligner : public View::PlaybackFrameAligner {
 public:
     ScoreBasedFrameAligner(Session *session) : m_session(session) { }
 
-    sv_frame_t map(const View *forView, sv_frame_t frame) const override {
-
+    sv_frame_t map(const View *forView, sv_frame_t frame) const override
+    {
         auto sourcePane = m_session->getPaneContainingOnsetsLayer();
         if (forView == sourcePane) {
             return frame;
@@ -169,10 +169,14 @@ public:
         if (!targetLayer) {
             return frame;
         }
-        
-        QString label = mapToScoreLabel(frame);
 
-        //!!! miserably slow
+        QString label;
+        double proportion;
+        mapToScoreLabelAndProportion(frame, label, proportion);
+
+        //!!! miserably slow (I assume! - measure it - but at any rate
+        //!!! this is doing the same query as in
+        //!!! mapToScoreLabelAndProportion all over again)
         
         ModelId targetId = targetLayer->getModel();
         auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
@@ -180,31 +184,47 @@ public:
         int eventCount = targetModel->getEventCount();
         for (int i = 0; i < eventCount; ++i) {
             if (label == events[i].getLabel()) {
-                return events[i].getFrame();
+                sv_frame_t eventFrame = events[i].getFrame();
+                if (proportion == 0.0 || i + 1 == eventCount) {
+                    return eventFrame;
+                } else {
+                    return sv_frame_t
+                        (round(eventFrame + proportion *
+                               (events[i+1].getFrame() - eventFrame)));
+                }
             }
         }
         
         return frame;
     }
 
-    QString mapToScoreLabel(sv_frame_t frame) const {
-
-        //!!! Much too slow - rework with search & cacheing
-        
-        // The default tempo is quarter note = 120 bpm.
-
+    QString mapToScoreLabel(sv_frame_t frame) const
+    {
         QString label;
-        TimeInstantLayer *targetLayer = m_session->getOnsetsLayer();
+        double proportion;
+        mapToScoreLabelAndProportion(frame, label, proportion);
+        return label;
+    }
 
+    void mapToScoreLabelAndProportion(sv_frame_t frame,
+                                      QString &label,
+                                      double &proportion) const
+    {
+        //!!! Much too slow - rework with search & cacheing
+
+        label = "";
+        proportion = 0.0;
+        
+        TimeInstantLayer *targetLayer = m_session->getOnsetsLayer();
         if (!targetLayer) {
-            return label;
+            return;
         }
         
         ModelId targetId = targetLayer->getModel();
         auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
         auto events = targetModel->getAllEvents();
         if (events.empty()) {
-            return label;
+            return;
         }
         
         label = events[0].getLabel();
@@ -212,9 +232,13 @@ public:
         int eventCount = targetModel->getEventCount();
         for (int i = 1; i < eventCount; ++i) {
             sv_frame_t eventFrame = events[i].getFrame();
-//            SVDEBUG << "MainWindow::highlightFrameInScore: seeking frame " << frame << ": event index = " << i << ": " << "Frame = " << eventFrame << ", Value = " << events[i].getValue() << ", Label = " << events[i].getLabel() << endl;
             if (frame < eventFrame) {
                 label = events[i-1].getLabel();
+                sv_frame_t priorEventFrame = events[i-1].getFrame();
+                if (priorEventFrame < eventFrame) {
+                    proportion = double(frame - priorEventFrame) /
+                        double(eventFrame - priorEventFrame);
+                }
                 found = true;
                 break;
             } else if (frame == eventFrame) {
@@ -226,8 +250,6 @@ public:
         if (!found && eventCount > 0) {
             label = events[eventCount-1].getLabel();
         }
-
-        return label;
     }
 
 private:
