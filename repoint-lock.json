@@ -7,7 +7,7 @@
       "pin": "4350c53ab2a407f5d0048e6db81ac4e9c8e9a7ca"
     },
     "svgui": {
-      "pin": "4534b055067b313157aaa31db3d3ce876f7fc086"
+      "pin": "c75d6334f04a07b0441f93468a9d121e187deb2a"
     },
     "svapp": {
       "pin": "6e1aa0359731cd03b3ff5cd7f1a1a9d349230327"
@@ -51,11 +51,11 @@
     "bqthingfactory": {
       "pin": "2e4bd170f57f"
     },
-    "dummy-score-aligner": {
-      "pin": "489aba2ef9411dea17eb407aa7332ddc8152f960"
-    },
     "piano-aligner": {
       "pin": "3b1500314e36aa73bc37587bcfee056c799794cb"
+    },
+    "dummy-score-aligner": {
+      "pin": "489aba2ef9411dea17eb407aa7332ddc8152f960"
     }
   }
 }
