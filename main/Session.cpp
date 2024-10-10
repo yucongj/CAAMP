@@ -622,6 +622,7 @@ Session::propagateAlignmentFromMain()
         (m_pendingOnsetsLayer->getModel());
 
     m_document->addLayerToView(pane, m_pendingOnsetsLayer);
+    setOnsetsLayerProperties(m_pendingOnsetsLayer);
 
     auto events = mainOnsetsModel->getAllEvents();
 
