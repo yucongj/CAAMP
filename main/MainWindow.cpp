@@ -630,8 +630,8 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     
     m_showPropertyBoxesAction->trigger();
 
-    connect(&m_session, SIGNAL(alignmentReadyForReview()),
-            this, SLOT(alignmentReadyForReview()));
+    connect(&m_session, SIGNAL(alignmentReadyForReview(sv::Pane *, sv::Layer *)),
+            this, SLOT(alignmentReadyForReview(sv::Pane *, sv::Layer *)));
     connect(&m_session, SIGNAL(alignmentModified()),
             this, SLOT(alignmentModified()));
     connect(&m_session, SIGNAL(alignmentAccepted()),
@@ -3043,14 +3043,12 @@ MainWindow::layerAdded(Layer *layer)
 }
 
 void
-MainWindow::alignmentReadyForReview()
+MainWindow::alignmentReadyForReview(Pane *onsetsPane, Layer *onsetsLayer)
 {
     SVDEBUG << "MainWindow::alignmentReadyForReview" << endl;
 
-    TimeInstantLayer *onsetsLayer = m_session.getOnsetsLayer();
-    Pane *onsetsPane = m_session.getPaneContainingOnsetsLayer();
-    if (!onsetsLayer) {
-        SVDEBUG << "MainWindow::alignmentReadyForReview: can't find an onsets layer!" << endl;
+    if (!onsetsPane || !onsetsLayer) {
+        SVDEBUG << "MainWindow::alignmentReadyForReview: no pane or layer provided" << endl;
         return;
     }
 

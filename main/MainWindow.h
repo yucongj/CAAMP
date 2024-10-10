@@ -156,7 +156,7 @@ protected slots:
     void scoreLocationActivated(Fraction, ScoreWidget::EventLabel, ScoreWidget::InteractionMode);
     void actOnScoreLocation(Fraction, ScoreWidget::EventLabel, ScoreWidget::InteractionMode, bool activated);
     void scoreInteractionEnded(ScoreWidget::InteractionMode);
-    void alignmentReadyForReview();
+    void alignmentReadyForReview(sv::Pane *, sv::Layer *);
     void alignmentModified();
     void alignmentAccepted();
     void alignmentRejected();

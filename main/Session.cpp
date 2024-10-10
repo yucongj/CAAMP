@@ -32,7 +32,9 @@
 using namespace std;
 using namespace sv;
 
-Session::Session()
+Session::Session() :
+    m_pendingOnsetsPane(nullptr),
+    m_pendingOnsetsLayer(nullptr)
 {
     SVDEBUG << "Session::Session" << endl;
     setDocument(nullptr, nullptr, nullptr, nullptr);
@@ -68,7 +70,8 @@ Session::setDocument(Document *doc,
 
     m_partialAlignmentAudioStart = -1;
     m_partialAlignmentAudioEnd = -1;
-    
+
+    m_pendingOnsetsPane = nullptr;
     m_pendingOnsetsLayer = nullptr;
     m_audioModelForPendingOnsets = {};
     
@@ -389,7 +392,7 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
         emit alignmentFailedToRun("No suitable score alignment plugin found");
         return;
     }
-    
+
     vector<pair<QString, pair<Pane *, TimeInstantLayer **>>> layerDefinitions {
         { alignmentTransformId,
           { activeAudioPane, &m_pendingOnsetsLayer }
@@ -511,6 +514,7 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     m_partialAlignmentAudioStart = audioFrameStart;
     m_partialAlignmentAudioEnd = audioFrameEnd;
     
+    m_pendingOnsetsPane = activeAudioPane;
     m_audioModelForPendingOnsets = activeModelId;
 }
 
@@ -568,7 +572,7 @@ Session::alignmentComplete()
     recalculateTempoLayer();
     updateOnsetColours();
     
-    emit alignmentReadyForReview();
+    emit alignmentReadyForReview(m_pendingOnsetsPane, m_pendingOnsetsLayer);
 }
 
 void

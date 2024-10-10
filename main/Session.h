@@ -92,7 +92,7 @@ public slots:
     void signifyNavigateMode();
     
 signals:
-    void alignmentReadyForReview();
+    void alignmentReadyForReview(sv::Pane *, sv::Layer *);
     void alignmentAccepted();
     void alignmentRejected();
     void alignmentModified();
@@ -122,6 +122,7 @@ private:
     sv::sv_frame_t m_partialAlignmentAudioStart;
     sv::sv_frame_t m_partialAlignmentAudioEnd;
 
+    sv::Pane *m_pendingOnsetsPane;
     sv::TimeInstantLayer *m_pendingOnsetsLayer;
     sv::ModelId m_audioModelForPendingOnsets;
     
