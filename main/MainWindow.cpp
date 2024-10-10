@@ -945,7 +945,7 @@ MainWindow::setupFileMenu()
     toolbar->addAction(action);
     menu->addAction(action);
 
-    m_propagateAlignmentAction = new QAction(tr("(temporary alignment copying action)"), this);
+    m_propagateAlignmentAction = new QAction(tr("Copy Score Alignment from First Recording"), this);
     connect(m_propagateAlignmentAction, SIGNAL(triggered()), this, SLOT(propagateAlignmentFromReference()));
     connect(this, SIGNAL(canPropagateAlignment(bool)), m_propagateAlignmentAction, SLOT(setEnabled(bool)));
     menu->addAction(m_propagateAlignmentAction);
