@@ -172,41 +172,31 @@ public:
 
         QString label;
         double proportion;
-        mapToScoreLabelAndProportion(frame, label, proportion);
 
-        //!!! miserably slow (I assume! - measure it - but at any rate
-        //!!! this is doing the same query as in
-        //!!! mapToScoreLabelAndProportion all over again)
-        
-        ModelId targetId = targetLayer->getModel();
-        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
-        auto events = targetModel->getAllEvents();
-        int eventCount = targetModel->getEventCount();
-        for (int i = 0; i < eventCount; ++i) {
-            if (label == events[i].getLabel()) {
-                sv_frame_t eventFrame = events[i].getFrame();
-                if (proportion == 0.0 || i + 1 == eventCount) {
-                    return eventFrame;
-                } else {
-                    return sv_frame_t
-                        (round(eventFrame + proportion *
-                               (events[i+1].getFrame() - eventFrame)));
-                }
-            }
-        }
+        mapToScoreLabelAndProportion(m_session->getOnsetsLayer(),
+                                     frame, label, proportion);
+
+        mapFromScoreLabelAndProportion(targetLayer,
+                                       label, proportion, frame);
         
         return frame;
     }
 
     QString mapToScoreLabel(sv_frame_t frame) const
     {
+        TimeInstantLayer *layer = m_session->getOnsetsLayer();
+        if (!layer) {
+            return {};
+        }
+        
         QString label;
         double proportion;
-        mapToScoreLabelAndProportion(frame, label, proportion);
+        mapToScoreLabelAndProportion(layer, frame, label, proportion);
         return label;
     }
 
-    void mapToScoreLabelAndProportion(sv_frame_t frame,
+    void mapToScoreLabelAndProportion(Layer *layer,
+                                      sv_frame_t frame,
                                       QString &label,
                                       double &proportion) const
     {
@@ -214,13 +204,11 @@ public:
 
         label = "";
         proportion = 0.0;
-        
-        TimeInstantLayer *targetLayer = m_session->getOnsetsLayer();
-        if (!targetLayer) {
+        if (!layer) {
             return;
         }
         
-        ModelId targetId = targetLayer->getModel();
+        ModelId targetId = layer->getModel();
         auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
         auto events = targetModel->getAllEvents();
         if (events.empty()) {
@@ -252,6 +240,37 @@ public:
         }
     }
 
+    void mapFromScoreLabelAndProportion(Layer *layer,
+                                        QString label,
+                                        double proportion,
+                                        sv_frame_t &frame) const
+    {
+        //!!! miserably slow (I assume! - measure it - but at any rate
+        //!!! this is doing the same query as in
+        //!!! mapToScoreLabelAndProportion all over again)
+
+        frame = 0;
+        
+        ModelId targetId = layer->getModel();
+        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
+        auto events = targetModel->getAllEvents();
+        int eventCount = targetModel->getEventCount();
+        for (int i = 0; i < eventCount; ++i) {
+            if (label == events[i].getLabel()) {
+                sv_frame_t eventFrame = events[i].getFrame();
+                if (proportion == 0.0 || i + 1 == eventCount) {
+                    frame = eventFrame;
+                    break;
+                } else {
+                    frame = sv_frame_t
+                        (round(eventFrame + proportion *
+                               (events[i+1].getFrame() - eventFrame)));
+                    break;
+                }
+            }
+        }
+    }
+    
 private:
     Session *m_session;
 };
@@ -5854,9 +5873,26 @@ MainWindow::restoreNormalPlayback()
 void
 MainWindow::currentPaneChanged(Pane *pane)
 {
-    MainWindowBase::currentPaneChanged(pane);
+    if (!pane) {
+        MainWindowBase::currentPaneChanged(pane);
+        return;
+    }
+    
+    QString scoreLabel;
+    double proportion = 0;
+    bool wasPlaying = false;
+    if (m_playSource && m_playSource->isPlaying()) {
+        sv_frame_t frame = m_playSource->getCurrentPlayingFrame();
+        m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
+            (m_session.getOnsetsLayer(), frame, scoreLabel, proportion);
+        wasPlaying = true;
+        m_playSource->stop();
+        SVDEBUG << "currentPaneChanged: mapped current playing frame "
+                << frame << " to score label " << scoreLabel
+                << " and proportion " << proportion << endl;
+    }
 
-    if (!pane || !m_panLayer) return;
+    MainWindowBase::currentPaneChanged(pane);
 
     // If this pane contains the main model, it usually makes sense to
     // show the main model in the pan layer even if it isn't the top
@@ -5886,7 +5922,7 @@ MainWindow::currentPaneChanged(Pane *pane)
             if (type != LayerFactory::TimeRuler) {
                 updateLayerShortcutsFor(modelId);
             }
-            if (type == LayerFactory::Waveform) {
+            if (type == LayerFactory::Waveform && m_panLayer) {
                 m_panLayer->setModel(modelId);
                 panLayerSet = true;
                 break;
@@ -5894,11 +5930,22 @@ MainWindow::currentPaneChanged(Pane *pane)
         }
     }
 
-    if (containsMainModel && !panLayerSet) {
+    if (containsMainModel && !panLayerSet && m_panLayer) {
         m_panLayer->setModel(getMainModelId());
     }
 
     m_session.setActivePane(pane);
+
+    if (wasPlaying) {
+        sv_frame_t frame;
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (m_session.getOnsetsLayer(), scoreLabel, proportion, frame);
+        SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
+                << " and proportion " << proportion
+                << " back to playback frame " << frame << endl;
+        m_playSource->play(frame);
+    }
+
     updateWindowTitle();
     updateMenuStates();
 }
