@@ -23,6 +23,7 @@
 #include "ScoreAlignmentTransform.h"
 #include "Session.h"
 #include "piano-aligner/Score.h"
+#include "align/Align.h"
 
 #include "view/Pane.h"
 #include "view/PaneStack.h"
@@ -151,6 +152,129 @@ using std::string;
 
 using namespace sv;
 
+class MainWindow::ScoreBasedFrameAligner : public View::PlaybackFrameAligner {
+public:
+    ScoreBasedFrameAligner(Session *session) : m_session(session) { }
+
+    sv_frame_t map(const View *forView, sv_frame_t frame) const override
+    {
+        auto sourcePane = m_session->getPaneContainingOnsetsLayer();
+        if (forView == sourcePane) {
+            return frame;
+        }
+
+        Pane *targetPane =
+            const_cast<Pane *>(dynamic_cast<const Pane *>(forView));
+        auto targetLayer = m_session->getOnsetsLayerFromPane(targetPane);
+        if (!targetLayer) {
+            return frame;
+        }
+
+        QString label;
+        double proportion;
+
+        mapToScoreLabelAndProportion(m_session->getOnsetsLayer(),
+                                     frame, label, proportion);
+
+        mapFromScoreLabelAndProportion(targetLayer,
+                                       label, proportion, frame);
+        
+        return frame;
+    }
+
+    QString mapToScoreLabel(sv_frame_t frame) const
+    {
+        TimeInstantLayer *layer = m_session->getOnsetsLayer();
+        if (!layer) {
+            return {};
+        }
+        
+        QString label;
+        double proportion;
+        mapToScoreLabelAndProportion(layer, frame, label, proportion);
+        return label;
+    }
+
+    void mapToScoreLabelAndProportion(Layer *layer,
+                                      sv_frame_t frame,
+                                      QString &label,
+                                      double &proportion) const
+    {
+        //!!! Much too slow - rework with search & cacheing
+
+        label = "";
+        proportion = 0.0;
+        if (!layer) {
+            return;
+        }
+        
+        ModelId targetId = layer->getModel();
+        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
+        auto events = targetModel->getAllEvents();
+        if (events.empty()) {
+            return;
+        }
+        
+        label = events[0].getLabel();
+        bool found = false;
+        int eventCount = targetModel->getEventCount();
+        for (int i = 1; i < eventCount; ++i) {
+            sv_frame_t eventFrame = events[i].getFrame();
+            if (frame < eventFrame) {
+                label = events[i-1].getLabel();
+                sv_frame_t priorEventFrame = events[i-1].getFrame();
+                if (priorEventFrame < eventFrame) {
+                    proportion = double(frame - priorEventFrame) /
+                        double(eventFrame - priorEventFrame);
+                }
+                found = true;
+                break;
+            } else if (frame == eventFrame) {
+                label = events[i].getLabel();
+                found = true;
+                break;
+            }
+        }
+        if (!found && eventCount > 0) {
+            label = events[eventCount-1].getLabel();
+        }
+    }
+
+    void mapFromScoreLabelAndProportion(Layer *layer,
+                                        QString label,
+                                        double proportion,
+                                        sv_frame_t &frame) const
+    {
+        //!!! miserably slow (I assume! - measure it - but at any rate
+        //!!! this is doing the same query as in
+        //!!! mapToScoreLabelAndProportion all over again)
+
+        frame = 0;
+        
+        ModelId targetId = layer->getModel();
+        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
+        auto events = targetModel->getAllEvents();
+        int eventCount = targetModel->getEventCount();
+        for (int i = 0; i < eventCount; ++i) {
+            if (label == events[i].getLabel()) {
+                sv_frame_t eventFrame = events[i].getFrame();
+                if (proportion == 0.0 || i + 1 == eventCount) {
+                    frame = eventFrame;
+                    break;
+                } else {
+                    frame = sv_frame_t
+                        (round(eventFrame + proportion *
+                               (events[i+1].getFrame() - eventFrame)));
+                    break;
+                }
+            }
+        }
+    }
+    
+private:
+    Session *m_session;
+};
+
 MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSupport) :
     MainWindowBase(audioMode, midiMode, int(PaneStack::Option::Default)),
     m_overview(nullptr),
@@ -192,7 +316,8 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_templateWatcher(nullptr),
     m_shouldStartOSCQueue(false),
     m_scoreAlignmentModified(false),
-    m_followScore(true)
+    m_followScore(true),
+    m_scoreBasedFrameAligner(new ScoreBasedFrameAligner(&m_session))
 {
     Profiler profiler("MainWindow::MainWindow");
 
@@ -287,6 +412,7 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
         (IconLoader().load("dataaccept"), tr("Accept Alignment"));
     connect(m_alignAcceptButton, SIGNAL(clicked()),
             &m_session, SLOT(acceptAlignment()));
+    m_scoreAlignmentAccepted = false;
 
     m_alignRejectButton = new QPushButton
         (IconLoader().load("datadelete"), tr("Reject Alignment"));
@@ -523,8 +649,8 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     
     m_showPropertyBoxesAction->trigger();
 
-    connect(&m_session, SIGNAL(alignmentReadyForReview()),
-            this, SLOT(alignmentReadyForReview()));
+    connect(&m_session, SIGNAL(alignmentReadyForReview(sv::Pane *, sv::Layer *)),
+            this, SLOT(alignmentReadyForReview(sv::Pane *, sv::Layer *)));
     connect(&m_session, SIGNAL(alignmentModified()),
             this, SLOT(alignmentModified()));
     connect(&m_session, SIGNAL(alignmentAccepted()),
@@ -545,6 +671,8 @@ MainWindow::~MainWindow()
 {
 //    SVDEBUG << "MainWindow::~MainWindow" << endl;
 
+    delete m_scoreBasedFrameAligner;
+    
     deleteTemporaryScoreFiles();
 
     delete m_keyReference;
@@ -817,6 +945,11 @@ MainWindow::setupFileMenu()
     toolbar->addAction(action);
     menu->addAction(action);
 
+    m_propagateAlignmentAction = new QAction(tr("Copy Score Alignment from First Recording"), this);
+    connect(m_propagateAlignmentAction, SIGNAL(triggered()), this, SLOT(propagateAlignmentFromReference()));
+    connect(this, SIGNAL(canPropagateAlignment(bool)), m_propagateAlignmentAction, SLOT(setEnabled(bool)));
+    menu->addAction(m_propagateAlignmentAction);
+
     menu->addSeparator();
 
     action = new QAction(tr("Import Annotation &Layer..."), this);
@@ -834,7 +967,7 @@ MainWindow::setupFileMenu()
     connect(this, SIGNAL(canExportLayer(bool)), action, SLOT(setEnabled(bool)));
     m_keyReference->registerShortcut(action);
     menu->addAction(action);
-
+    
     menu->addSeparator();
     
     action = new QAction(tr("Convert Audio from Data File..."), this);
@@ -2598,41 +2731,10 @@ MainWindow::viewManagerPlaybackFrameChanged(sv_frame_t frame)
 void
 MainWindow::highlightFrameInScore(sv_frame_t frame)
 {
-    // sv_samplerate_t rate = m_viewManager->getMainModelSampleRate();
-    // RealTime rt = RealTime::frame2RealTime(frame, rate);
-
-    // The default tempo is quarter note = 120 bpm.
-
-    TimeInstantLayer *targetLayer = m_session.getOnsetsLayer();
-
-    // If the program is slow, might want to consider a different approach that can get rid of the loops.
-    QString label;
-    if (targetLayer) {
-        ModelId targetId = targetLayer->getModel();
-        const auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
-        const auto events = targetModel->getAllEvents();
-        if (events.empty()) return;
-        label = events[0].getLabel();
-        bool found = false;
-        int eventCount = targetModel->getEventCount();
-        for (int i = 1; i < eventCount; ++i) {
-            sv_frame_t eventFrame = events[i].getFrame();
-//            SVDEBUG << "MainWindow::highlightFrameInScore: seeking frame " << frame << ": event index = " << i << ": " << "Frame = " << eventFrame << ", Value = " << events[i].getValue() << ", Label = " << events[i].getLabel() << endl;
-            if (frame < eventFrame) {
-                label = events[i-1].getLabel();
-                found = true;
-                break;
-            } else if (frame == eventFrame) {
-                label = events[i].getLabel();
-                found = true;
-                break;
-            }
-        }
-        if (!found && eventCount > 0) {
-            label = events[eventCount-1].getLabel();
-        }
+    QString label = m_scoreBasedFrameAligner->mapToScoreLabel(frame);
+    if (label == "") {
+        return;
     }
-
     m_scoreWidget->setHighlightEventByLabel(label.toStdString());
 }
 
@@ -2960,14 +3062,12 @@ MainWindow::layerAdded(Layer *layer)
 }
 
 void
-MainWindow::alignmentReadyForReview()
+MainWindow::alignmentReadyForReview(Pane *onsetsPane, Layer *onsetsLayer)
 {
     SVDEBUG << "MainWindow::alignmentReadyForReview" << endl;
 
-    TimeInstantLayer *onsetsLayer = m_session.getOnsetsLayer();
-    Pane *onsetsPane = m_session.getPaneContainingOnsetsLayer();
-    if (!onsetsLayer) {
-        SVDEBUG << "MainWindow::alignmentReadyForReview: can't find an onsets layer!" << endl;
+    if (!onsetsPane || !onsetsLayer) {
+        SVDEBUG << "MainWindow::alignmentReadyForReview: no pane or layer provided" << endl;
         return;
     }
 
@@ -2977,6 +3077,7 @@ MainWindow::alignmentReadyForReview()
     
     m_alignCommands->hide();
     m_alignAcceptReject->show();
+    m_scoreAlignmentAccepted = false;
 
     updateMenuStates();
 }
@@ -3009,6 +3110,7 @@ MainWindow::alignmentAccepted()
     m_paneStack->setCurrentLayer(onsetsPane, onsetsLayer);
 
     m_scoreAlignmentModified = true;
+    m_scoreAlignmentAccepted = true;
 
     updateMenuStates();
 }
@@ -3591,11 +3693,16 @@ MainWindow::updateMenuStates()
         }
     }
 
+    auto mainModelId = getMainModelId();
+    auto activeModelId = m_session.getActiveAudioModel();
+    
     bool haveMainModel =
-        (!getMainModelId().isNone());
+        (!mainModelId.isNone());
 
     bool scoreAlignmentOK =
-        haveMainModel && m_scoreId != "" && !m_alignAcceptReject->isVisible();
+        haveMainModel &&
+        m_scoreId != "" &&
+        m_scoreAlignmentAccepted;
     
     emit canSaveScoreAlignment(scoreAlignmentOK &&
                                m_scoreAlignmentFile != "" &&
@@ -3604,6 +3711,22 @@ MainWindow::updateMenuStates()
     emit canSaveScoreAlignmentAs(scoreAlignmentOK);
     emit canLoadScoreAlignment(true);
 
+    bool activeModelAlignmentComplete = false;
+    if (!activeModelId.isNone()) {
+        auto activeModel = ModelById::get(activeModelId);
+        if (!activeModel->getAlignment().isNone()) {
+            activeModelAlignmentComplete =
+                (activeModel->getAlignmentCompletion() == 100);
+        }
+    }
+
+    SVDEBUG << "for canPropagateAlignment: scoreAlignmentOK = " << scoreAlignmentOK << ", activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
+    
+    emit canPropagateAlignment(scoreAlignmentOK &&
+                               !activeModelId.isNone() &&
+                               activeModelId != mainModelId &&
+                               activeModelAlignmentComplete);
+    
     updateAlignButtonText();
 }
 
@@ -4128,6 +4251,25 @@ MainWindow::saveScoreAlignmentAs()
 }
 
 void
+MainWindow::propagateAlignmentFromReference()
+{
+    ModelId audioModelId = m_session.getActiveAudioModel();
+    if (audioModelId.isNone()) {
+        SVDEBUG << "MainWindow::copyAlignmentFromReference: No active audio" << endl;
+        return;
+    }
+
+    if (audioModelId == getMainModelId()) {
+        SVDEBUG << "MainWindow::copyAlignmentFromReference: Active audio *is* reference" << endl;
+        return;
+    }
+
+    //!!! handle case where alignment is not yet complete (Model::getAlignmentCompletion)
+
+    m_session.propagateAlignmentFromMain();
+}
+
+void
 MainWindow::importLayer()
 {
     Pane *pane = m_paneStack->getCurrentPane();
@@ -4511,11 +4653,12 @@ MainWindow::documentReplaced()
 {
     SVDEBUG << "MainWindow::documentReplaced" << endl;
     
-    if (m_document) {
-        connect(m_document, SIGNAL(activity(QString)),
-                m_activityLog, SLOT(activityHappened(QString)));
-    }
+    connect(m_document, SIGNAL(activity(QString)),
+            m_activityLog, SLOT(activityHappened(QString)));
 
+    Align::setAlignmentPreference(Align::MATCHAlignmentWithPitchCompare);
+    m_document->setAutoAlignment(true); // for audio-to-audio alignment
+    
     Pane *topPane = m_paneStack->addPane();
     Pane *bottomPane = m_paneStack->addPane();
 
@@ -4788,10 +4931,14 @@ MainWindow::manageSavedTemplates()
 void
 MainWindow::paneAdded(Pane *pane)
 {
-    if (m_overview) m_overview->registerView(pane);
+    if (m_overview) {
+        m_overview->registerView(pane);
+    }
     if (pane) {
         connect(pane, &Pane::cancelButtonPressed,
                 this, &MainWindow::paneCancelButtonPressed);
+        pane->setPlaybackFrameAligner(m_scoreBasedFrameAligner);
+        pane->setPlaybackFollow(PlaybackScrollPage);
     }
 }    
 
@@ -5726,9 +5873,26 @@ MainWindow::restoreNormalPlayback()
 void
 MainWindow::currentPaneChanged(Pane *pane)
 {
-    MainWindowBase::currentPaneChanged(pane);
+    if (!pane) {
+        MainWindowBase::currentPaneChanged(pane);
+        return;
+    }
+    
+    QString scoreLabel;
+    double proportion = 0;
+    bool wasPlaying = false;
+    if (m_playSource && m_playSource->isPlaying()) {
+        sv_frame_t frame = m_playSource->getCurrentPlayingFrame();
+        m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
+            (m_session.getOnsetsLayer(), frame, scoreLabel, proportion);
+        wasPlaying = true;
+        m_playSource->stop();
+        SVDEBUG << "currentPaneChanged: mapped current playing frame "
+                << frame << " to score label " << scoreLabel
+                << " and proportion " << proportion << endl;
+    }
 
-    if (!pane || !m_panLayer) return;
+    MainWindowBase::currentPaneChanged(pane);
 
     // If this pane contains the main model, it usually makes sense to
     // show the main model in the pan layer even if it isn't the top
@@ -5758,7 +5922,7 @@ MainWindow::currentPaneChanged(Pane *pane)
             if (type != LayerFactory::TimeRuler) {
                 updateLayerShortcutsFor(modelId);
             }
-            if (type == LayerFactory::Waveform) {
+            if (type == LayerFactory::Waveform && m_panLayer) {
                 m_panLayer->setModel(modelId);
                 panLayerSet = true;
                 break;
@@ -5766,12 +5930,24 @@ MainWindow::currentPaneChanged(Pane *pane)
         }
     }
 
-    if (containsMainModel && !panLayerSet) {
+    if (containsMainModel && !panLayerSet && m_panLayer) {
         m_panLayer->setModel(getMainModelId());
     }
 
     m_session.setActivePane(pane);
+
+    if (wasPlaying) {
+        sv_frame_t frame;
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (m_session.getOnsetsLayer(), scoreLabel, proportion, frame);
+        SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
+                << " and proportion " << proportion
+                << " back to playback frame " << frame << endl;
+        m_playSource->play(frame);
+    }
+
     updateWindowTitle();
+    updateMenuStates();
 }
 
 void
@@ -6057,6 +6233,7 @@ MainWindow::mainModelChanged(ModelId modelId)
 
     m_scoreAlignmentFile = "";
     m_scoreAlignmentModified = false;
+    m_scoreAlignmentAccepted = false;
     
     SVDEBUG << "MainWindow::mainModelChanged: Now calling m_session.setMainModel" << endl;
 

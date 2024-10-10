@@ -52,6 +52,7 @@ signals:
     void canSaveScoreAlignment(bool);
     void canSaveScoreAlignmentAs(bool);
     void canLoadScoreAlignment(bool);
+    void canPropagateAlignment(bool);
 
 public slots:
     void preferenceChanged(sv::PropertyContainer::PropertyName) override;
@@ -76,6 +77,7 @@ protected slots:
     virtual void loadScoreAlignment();
     virtual void saveScoreAlignment();
     virtual void saveScoreAlignmentAs();
+    virtual void propagateAlignmentFromReference();
     virtual void importLayer();
     virtual void exportLayer();
     virtual void exportImage();
@@ -154,7 +156,7 @@ protected slots:
     void scoreLocationActivated(Fraction, ScoreWidget::EventLabel, ScoreWidget::InteractionMode);
     void actOnScoreLocation(Fraction, ScoreWidget::EventLabel, ScoreWidget::InteractionMode, bool activated);
     void scoreInteractionEnded(ScoreWidget::InteractionMode);
-    void alignmentReadyForReview();
+    void alignmentReadyForReview(sv::Pane *, sv::Layer *);
     void alignmentModified();
     void alignmentAccepted();
     void alignmentRejected();
@@ -279,6 +281,7 @@ protected:
     QAction                 *m_scrollLeftAction;
     QAction                 *m_scrollRightAction;
     QAction                 *m_showPropertyBoxesAction;
+    QAction                 *m_propagateAlignmentAction;
 
     bool                     m_soloModified;
     bool                     m_prevSolo;
@@ -292,16 +295,16 @@ protected:
     QPointer<PreferencesDialog> m_preferencesDialog;
     QPointer<sv::LayerTreeDialog>   m_layerTreeDialog;
 
-    sv::ActivityLog             *m_activityLog;
-    sv::UnitConverter           *m_unitConverter;
-    sv::KeyReference            *m_keyReference;
+    sv::ActivityLog         *m_activityLog;
+    sv::UnitConverter       *m_unitConverter;
+    sv::KeyReference        *m_keyReference;
 
     QFileSystemWatcher      *m_templateWatcher;
 
     bool                     m_shouldStartOSCQueue;
     
     Surveyer                *m_surveyer;
-    sv::VersionTester           *m_versionTester;
+    sv::VersionTester       *m_versionTester;
     QString                  m_newerVersionIs;
 
     QString                  m_scoreId;
@@ -309,7 +312,11 @@ protected:
     Score                    m_score;
     QString                  m_scoreAlignmentFile;
     bool                     m_scoreAlignmentModified;
+    bool                     m_scoreAlignmentAccepted;
     bool                     m_followScore;
+
+    class ScoreBasedFrameAligner;
+    ScoreBasedFrameAligner  *m_scoreBasedFrameAligner;
 
     std::vector<std::string> m_scoreFilesToDelete;
     void deleteTemporaryScoreFiles();
