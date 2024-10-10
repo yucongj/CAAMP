@@ -393,6 +393,7 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
         (IconLoader().load("dataaccept"), tr("Accept Alignment"));
     connect(m_alignAcceptButton, SIGNAL(clicked()),
             &m_session, SLOT(acceptAlignment()));
+    m_scoreAlignmentAccepted = false;
 
     m_alignRejectButton = new QPushButton
         (IconLoader().load("datadelete"), tr("Reject Alignment"));
@@ -925,9 +926,10 @@ MainWindow::setupFileMenu()
     toolbar->addAction(action);
     menu->addAction(action);
 
-    action = new QAction(tr("(temporary alignment copying action)"), this);
-    connect(action, SIGNAL(triggered()), this, SLOT(copyAlignmentFromReference()));
-    menu->addAction(action);
+    m_propagateAlignmentAction = new QAction(tr("(temporary alignment copying action)"), this);
+    connect(m_propagateAlignmentAction, SIGNAL(triggered()), this, SLOT(propagateAlignmentFromReference()));
+    connect(this, SIGNAL(canPropagateAlignment(bool)), m_propagateAlignmentAction, SLOT(setEnabled(bool)));
+    menu->addAction(m_propagateAlignmentAction);
 
     menu->addSeparator();
 
@@ -3058,6 +3060,7 @@ MainWindow::alignmentReadyForReview()
     
     m_alignCommands->hide();
     m_alignAcceptReject->show();
+    m_scoreAlignmentAccepted = false;
 
     updateMenuStates();
 }
@@ -3090,6 +3093,7 @@ MainWindow::alignmentAccepted()
     m_paneStack->setCurrentLayer(onsetsPane, onsetsLayer);
 
     m_scoreAlignmentModified = true;
+    m_scoreAlignmentAccepted = true;
 
     updateMenuStates();
 }
@@ -3672,11 +3676,16 @@ MainWindow::updateMenuStates()
         }
     }
 
+    auto mainModelId = getMainModelId();
+    auto activeModelId = m_session.getActiveAudioModel();
+    
     bool haveMainModel =
-        (!getMainModelId().isNone());
+        (!mainModelId.isNone());
 
     bool scoreAlignmentOK =
-        haveMainModel && m_scoreId != "" && !m_alignAcceptReject->isVisible();
+        haveMainModel &&
+        m_scoreId != "" &&
+        m_scoreAlignmentAccepted;
     
     emit canSaveScoreAlignment(scoreAlignmentOK &&
                                m_scoreAlignmentFile != "" &&
@@ -3685,6 +3694,22 @@ MainWindow::updateMenuStates()
     emit canSaveScoreAlignmentAs(scoreAlignmentOK);
     emit canLoadScoreAlignment(true);
 
+    bool activeModelAlignmentComplete = false;
+    if (!activeModelId.isNone()) {
+        auto activeModel = ModelById::get(activeModelId);
+        if (!activeModel->getAlignment().isNone()) {
+            activeModelAlignmentComplete =
+                (activeModel->getAlignmentCompletion() == 100);
+        }
+    }
+
+    SVDEBUG << "for canPropagateAlignment: scoreAlignmentOK = " << scoreAlignmentOK << ", activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
+    
+    emit canPropagateAlignment(scoreAlignmentOK &&
+                               !activeModelId.isNone() &&
+                               activeModelId != mainModelId &&
+                               activeModelAlignmentComplete);
+    
     updateAlignButtonText();
 }
 
@@ -4209,7 +4234,7 @@ MainWindow::saveScoreAlignmentAs()
 }
 
 void
-MainWindow::copyAlignmentFromReference()
+MainWindow::propagateAlignmentFromReference()
 {
     ModelId audioModelId = m_session.getActiveAudioModel();
     if (audioModelId.isNone()) {
@@ -5876,6 +5901,7 @@ MainWindow::currentPaneChanged(Pane *pane)
 
     m_session.setActivePane(pane);
     updateWindowTitle();
+    updateMenuStates();
 }
 
 void
@@ -6161,6 +6187,7 @@ MainWindow::mainModelChanged(ModelId modelId)
 
     m_scoreAlignmentFile = "";
     m_scoreAlignmentModified = false;
+    m_scoreAlignmentAccepted = false;
     
     SVDEBUG << "MainWindow::mainModelChanged: Now calling m_session.setMainModel" << endl;
 

@@ -52,6 +52,7 @@ signals:
     void canSaveScoreAlignment(bool);
     void canSaveScoreAlignmentAs(bool);
     void canLoadScoreAlignment(bool);
+    void canPropagateAlignment(bool);
 
 public slots:
     void preferenceChanged(sv::PropertyContainer::PropertyName) override;
@@ -76,7 +77,7 @@ protected slots:
     virtual void loadScoreAlignment();
     virtual void saveScoreAlignment();
     virtual void saveScoreAlignmentAs();
-    virtual void copyAlignmentFromReference();
+    virtual void propagateAlignmentFromReference();
     virtual void importLayer();
     virtual void exportLayer();
     virtual void exportImage();
@@ -280,6 +281,7 @@ protected:
     QAction                 *m_scrollLeftAction;
     QAction                 *m_scrollRightAction;
     QAction                 *m_showPropertyBoxesAction;
+    QAction                 *m_propagateAlignmentAction;
 
     bool                     m_soloModified;
     bool                     m_prevSolo;
@@ -310,6 +312,7 @@ protected:
     Score                    m_score;
     QString                  m_scoreAlignmentFile;
     bool                     m_scoreAlignmentModified;
+    bool                     m_scoreAlignmentAccepted;
     bool                     m_followScore;
 
     class ScoreBasedFrameAligner;
