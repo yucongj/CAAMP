@@ -32,7 +32,9 @@
 using namespace std;
 using namespace sv;
 
-Session::Session()
+Session::Session() :
+    m_pendingOnsetsPane(nullptr),
+    m_pendingOnsetsLayer(nullptr)
 {
     SVDEBUG << "Session::Session" << endl;
     setDocument(nullptr, nullptr, nullptr, nullptr);
@@ -68,7 +70,8 @@ Session::setDocument(Document *doc,
 
     m_partialAlignmentAudioStart = -1;
     m_partialAlignmentAudioEnd = -1;
-    
+
+    m_pendingOnsetsPane = nullptr;
     m_pendingOnsetsLayer = nullptr;
     m_audioModelForPendingOnsets = {};
     
@@ -179,6 +182,12 @@ Session::getAudioModelFromPane(Pane *pane) const
     }
 
     return {};
+}
+
+TimeInstantLayer *
+Session::getOnsetsLayerFromPane(Pane *pane) const
+{
+    return getOnsetsLayerFromPane(pane, OnsetsLayerSelection::PermitPendingOnsets);
 }
 
 TimeInstantLayer *
@@ -383,7 +392,7 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
         emit alignmentFailedToRun("No suitable score alignment plugin found");
         return;
     }
-    
+
     vector<pair<QString, pair<Pane *, TimeInstantLayer **>>> layerDefinitions {
         { alignmentTransformId,
           { activeAudioPane, &m_pendingOnsetsLayer }
@@ -505,6 +514,7 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     m_partialAlignmentAudioStart = audioFrameStart;
     m_partialAlignmentAudioEnd = audioFrameEnd;
     
+    m_pendingOnsetsPane = activeAudioPane;
     m_audioModelForPendingOnsets = activeModelId;
 }
 
@@ -562,7 +572,73 @@ Session::alignmentComplete()
     recalculateTempoLayer();
     updateOnsetColours();
     
-    emit alignmentReadyForReview();
+    emit alignmentReadyForReview(m_pendingOnsetsPane, m_pendingOnsetsLayer);
+}
+
+void
+Session::propagateAlignmentFromMain()
+{
+    SVDEBUG << "Session::propagateAlignmentFromMain" << endl;
+    
+    auto mainOnsetsLayer = getOnsetsLayerFromPane
+        (getAudioPaneForAudioModel(m_mainModel),
+         OnsetsLayerSelection::ExcludePendingOnsets);
+    if (!mainOnsetsLayer) {
+        SVDEBUG << "Session::propagateAlignmentFromMain: No onsets layer found for main model " << m_mainModel << endl;
+        return;
+    }
+
+    shared_ptr<SparseOneDimensionalModel> mainOnsetsModel =
+        ModelById::getAs<SparseOneDimensionalModel>
+        (mainOnsetsLayer->getModel());
+    if (!mainOnsetsModel) {
+        SVDEBUG << "Session::propagateAlignmentFromMain: No onsets model found for main model" << endl;
+        return;
+    }
+
+    ModelId activeModelId = getActiveAudioModel();
+    auto activeModel = ModelById::getAs<RangeSummarisableTimeValueModel>
+        (activeModelId);
+    if (!activeModel) {
+        SVDEBUG << "Session::propagateAlignmentFromMain: No active audio model" << endl;
+        return;
+    }
+
+    Pane *pane = getAudioPaneForAudioModel(activeModelId);
+    if (!pane) {
+        SVDEBUG << "Session::propagateAlignmentFromMain: No pane for active model" << endl;
+        return;
+    }
+    
+    if (m_pendingOnsetsLayer) {
+        m_document->deleteLayer(m_pendingOnsetsLayer, true);
+    }
+
+    m_pendingOnsetsLayer = qobject_cast<TimeInstantLayer *>
+        (m_document->createEmptyLayer(LayerFactory::TimeInstants));
+    
+    shared_ptr<SparseOneDimensionalModel> pendingOnsetsModel =
+        ModelById::getAs<SparseOneDimensionalModel>
+        (m_pendingOnsetsLayer->getModel());
+
+    m_document->addLayerToView(pane, m_pendingOnsetsLayer);
+    setOnsetsLayerProperties(m_pendingOnsetsLayer);
+
+    auto events = mainOnsetsModel->getAllEvents();
+
+    for (auto e : events) {
+        sv_frame_t mapped = activeModel->alignFromReference(e.getFrame());
+        SVDEBUG << "mapped event frame " << e.getFrame() << " to "
+                << mapped << endl;
+        pendingOnsetsModel->add(Event(mapped, e.getLabel()));
+    }
+
+    m_partialAlignmentAudioStart = -1;
+    m_partialAlignmentAudioEnd = -1;
+
+    m_audioModelForPendingOnsets = activeModelId;
+    
+    alignmentComplete();
 }
 
 void

@@ -45,10 +45,12 @@ public:
 
     sv::TimeInstantLayer *getOnsetsLayer();
     sv::Pane *getPaneContainingOnsetsLayer();
+    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *pane) const;
     
     sv::TimeValueLayer *getTempoLayer();
     sv::Pane *getPaneContainingTempoLayer();
 
+    sv::ModelId getActiveAudioModel() const;
     QString getActiveAudioTitle() const;
     
     bool exportAlignmentTo(QString filename);
@@ -80,6 +82,9 @@ public slots:
                                int scorePositionEndDenominator,
                                sv::sv_frame_t audioFrameStart,
                                sv::sv_frame_t audioFrameEnd);
+
+    void propagateAlignmentFromMain();
+    
     void acceptAlignment();
     void rejectAlignment();
 
@@ -87,7 +92,7 @@ public slots:
     void signifyNavigateMode();
     
 signals:
-    void alignmentReadyForReview();
+    void alignmentReadyForReview(sv::Pane *, sv::Layer *);
     void alignmentAccepted();
     void alignmentRejected();
     void alignmentModified();
@@ -117,6 +122,7 @@ private:
     sv::sv_frame_t m_partialAlignmentAudioStart;
     sv::sv_frame_t m_partialAlignmentAudioEnd;
 
+    sv::Pane *m_pendingOnsetsPane;
     sv::TimeInstantLayer *m_pendingOnsetsLayer;
     sv::ModelId m_audioModelForPendingOnsets;
     
@@ -124,7 +130,6 @@ private:
 
     bool m_inEditMode;
 
-    sv::ModelId getActiveAudioModel() const;
     sv::ModelId getAudioModelFromPane(sv::Pane *) const;
     sv::Pane *getAudioPaneForAudioModel(sv::ModelId) const;
 
@@ -132,8 +137,8 @@ private:
         PermitPendingOnsets,
         ExcludePendingOnsets
     };
-    sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *,
-                                                 OnsetsLayerSelection) const;
+    sv::TimeInstantLayer *getOnsetsLayerFromPane
+    (sv::Pane *, OnsetsLayerSelection) const;
     
     void setOnsetsLayerProperties(sv::TimeInstantLayer *);
     void alignmentComplete();
