@@ -249,6 +249,10 @@ public:
         //!!! this is doing the same query as in
         //!!! mapToScoreLabelAndProportion all over again)
 
+        if (!layer) {
+            return; // leave frame unchanged
+        }
+        
         frame = 0;
         
         ModelId targetId = layer->getModel();
@@ -2941,7 +2945,7 @@ MainWindow::actOnScoreLocation(Fraction location,
 }
 
 void
-MainWindow::scoreInteractionEnded(ScoreWidget::InteractionMode mode)
+MainWindow::scoreInteractionEnded(ScoreWidget::InteractionMode)
 {
     TimeInstantLayer *targetLayer = m_session.getOnsetsLayer();
     if (targetLayer) {
@@ -3056,7 +3060,7 @@ MainWindow::scoreAlignerChosen(TransformId id)
 }
 
 void
-MainWindow::layerAdded(Layer *layer)
+MainWindow::layerAdded(Layer *)
 {
     SVDEBUG << "MainWindow::layerAdded" << endl;
 }
@@ -5881,15 +5885,18 @@ MainWindow::currentPaneChanged(Pane *pane)
     QString scoreLabel;
     double proportion = 0;
     bool wasPlaying = false;
+    sv_frame_t playingFrame = 0;
     if (m_playSource && m_playSource->isPlaying()) {
-        sv_frame_t frame = m_playSource->getCurrentPlayingFrame();
+        playingFrame = m_playSource->getCurrentPlayingFrame();
         m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
-            (m_session.getOnsetsLayer(), frame, scoreLabel, proportion);
+            (m_session.getOnsetsLayer(), playingFrame, scoreLabel, proportion);
         wasPlaying = true;
-        m_playSource->stop();
         SVDEBUG << "currentPaneChanged: mapped current playing frame "
-                << frame << " to score label " << scoreLabel
+                << playingFrame << " to score label " << scoreLabel
                 << " and proportion " << proportion << endl;
+        if (scoreLabel != "") {
+            m_playSource->stop();
+        }
     }
 
     MainWindowBase::currentPaneChanged(pane);
@@ -5937,13 +5944,14 @@ MainWindow::currentPaneChanged(Pane *pane)
     m_session.setActivePane(pane);
 
     if (wasPlaying) {
-        sv_frame_t frame;
-        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
-            (m_session.getOnsetsLayer(), scoreLabel, proportion, frame);
-        SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
-                << " and proportion " << proportion
-                << " back to playback frame " << frame << endl;
-        m_playSource->play(frame);
+        if (scoreLabel != "") {
+            m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+                (m_session.getOnsetsLayer(), scoreLabel, proportion, playingFrame);
+            SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
+                    << " and proportion " << proportion
+                    << " back to playback frame " << playingFrame << endl;
+            m_playSource->play(playingFrame);
+        }
     }
 
     updateWindowTitle();
