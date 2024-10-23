@@ -32,6 +32,9 @@
 using namespace std;
 using namespace sv;
 
+const TransformId
+Session::smartCopyTransformId = "*smartcopy*";
+
 Session::Session() :
     m_pendingOnsetsPane(nullptr),
     m_pendingOnsetsLayer(nullptr)
@@ -378,14 +381,19 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
         SVDEBUG << "Session::beginPartialAlignment: ERROR: Failed to find audio pane for active model " << activeModelId << endl;
         return;
     }
-    
-    ModelTransformer::Input input(activeModelId);
 
     TransformId alignmentTransformId = m_alignmentTransformId;
     if (alignmentTransformId == "") {
         alignmentTransformId =
             ScoreAlignmentTransform::getDefaultAlignmentTransform();
     }
+
+    if (alignmentTransformId == smartCopyTransformId) {
+        propagateAlignmentFromMain();
+        return;
+    }
+    
+    ModelTransformer::Input input(activeModelId);
 
     if (alignmentTransformId == "") {
         SVDEBUG << "Session::beginPartialAlignment: ERROR: No alignment transform found" << endl;

@@ -58,6 +58,8 @@ public:
 
     void setMusicalEvents(const Score::MusicalEventList &musicalEvents);
 
+    static const sv::TransformId smartCopyTransformId;
+                                                                       
 public slots:
     void setDocument(sv::Document *,
                      sv::Pane *topAudioPane,

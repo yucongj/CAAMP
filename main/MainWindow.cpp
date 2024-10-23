@@ -308,6 +308,7 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_recordAction(nullptr),
     m_playSelectionAction(nullptr),
     m_playLoopAction(nullptr),
+    m_chooseSmartCopyAction(nullptr),
     m_soloModified(false),
     m_prevSolo(false),
     m_playControlsSpacer(nullptr),
@@ -397,6 +398,8 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_alignButton->setMinimumWidth(alignButtonWidth);
     connect(m_alignButton, SIGNAL(clicked()),
             this, SLOT(alignButtonClicked()));
+    connect(this, SIGNAL(canAlign(bool)),
+            m_alignButton, SLOT(setEnabled(bool)));
     m_alignButton->setEnabled(false);
     m_subsetOfScoreSelected = false;
 
@@ -3009,6 +3012,9 @@ MainWindow::populateScoreAlignerChoiceMenu()
     if (settings.contains(preferredTransformKey)) {
         TransformId id = settings.value
             (preferredTransformKey, defaultId).toString();
+        if (id == Session::smartCopyTransformId) {
+            id = defaultId;
+        }
         bool found = false;
         for (const auto &t : transforms) {
             if (t.identifier == id) {
@@ -3042,6 +3048,13 @@ MainWindow::populateScoreAlignerChoiceMenu()
         action->setChecked(t.identifier == defaultId);
         alignerGroup->addAction(action);
     }
+    m_chooseSmartCopyAction = menu->addAction(tr("Smart Copy from First Recording"), [=]() {
+        scoreAlignerChosen(Session::smartCopyTransformId);
+    });
+    m_chooseSmartCopyAction->setData(Session::smartCopyTransformId);
+    m_chooseSmartCopyAction->setCheckable(true);
+    m_chooseSmartCopyAction->setChecked(false);
+    alignerGroup->addAction(m_chooseSmartCopyAction);
     m_alignerChoice->setMenu(menu);
 }
 
@@ -3057,6 +3070,8 @@ MainWindow::scoreAlignerChosen(TransformId id)
     QString preferredTransformKey = "transformId";
     settings.setValue(preferredTransformKey, id);
     settings.endGroup();
+
+    updateMenuStates();
 }
 
 void
@@ -3658,10 +3673,6 @@ MainWindow::updateMenuStates()
     bool alignMode = m_viewManager && m_viewManager->getAlignMode();
     emit canChangeSolo(havePlayTarget && !alignMode);
 
-    if (TransformFactory::getInstance()->havePopulatedInstalledTransforms()) {
-        emit canAlign(havePlayTarget && m_document && m_document->canAlign());
-    }
-
     emit canChangePlaybackSpeed(true);
     int v = m_playSpeed->value();
     emit canSpeedUpPlayback(v < m_playSpeed->maximum());
@@ -3703,9 +3714,12 @@ MainWindow::updateMenuStates()
     bool haveMainModel =
         (!mainModelId.isNone());
 
-    bool scoreAlignmentOK =
+    bool haveScore =
         haveMainModel &&
-        m_scoreId != "" &&
+        m_scoreId != "";
+
+    bool scoreAlignmentOK =
+        haveScore &&
         m_scoreAlignmentAccepted;
     
     emit canSaveScoreAlignment(scoreAlignmentOK &&
@@ -3725,11 +3739,20 @@ MainWindow::updateMenuStates()
     }
 
     SVDEBUG << "for canPropagateAlignment: scoreAlignmentOK = " << scoreAlignmentOK << ", activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
+
+    bool canPropagate =
+        haveScore &&
+        !activeModelId.isNone() &&
+        activeModelId != mainModelId &&
+        activeModelAlignmentComplete;
     
-    emit canPropagateAlignment(scoreAlignmentOK &&
-                               !activeModelId.isNone() &&
-                               activeModelId != mainModelId &&
-                               activeModelAlignmentComplete);
+    emit canPropagateAlignment(canPropagate);
+    
+    if (m_chooseSmartCopyAction && m_chooseSmartCopyAction->isChecked()) {
+        emit canAlign(haveScore && canPropagate);
+    } else {
+        emit canAlign(haveScore);
+    }
     
     updateAlignButtonText();
 }
@@ -6254,7 +6277,9 @@ MainWindow::updateAlignButtonText()
 {
     bool subsetOfAudioSelected = !m_viewManager->getSelections().empty();
     QString label = tr("Align");
-    if (m_subsetOfScoreSelected) {
+    if (m_chooseSmartCopyAction && m_chooseSmartCopyAction->isChecked()) {
+        label = tr("Smart Copy from First Recording");
+    } else if (m_subsetOfScoreSelected) {
         if (subsetOfAudioSelected) {
             label = tr("Align Selections of Score and Audio");
         } else {
