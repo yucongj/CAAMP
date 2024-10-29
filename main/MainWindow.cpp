@@ -256,7 +256,20 @@ public:
         frame = 0;
         
         ModelId targetId = layer->getModel();
-        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
+        mapFromScoreLabelAndProportion(targetId, label, proportion, frame);
+    }
+
+    void mapFromScoreLabelAndProportion(ModelId targetModelId,
+                                        QString label,
+                                        double proportion,
+                                        sv_frame_t &frame) const
+    {
+        frame = 0;
+        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetModelId);
+        if (!targetModel) {
+            SVDEBUG << "ERROR: mapFromScoreLabelAndProportion: model is not a SparseOneDimensionalModel" << endl;
+            return;
+        }
         auto events = targetModel->getAllEvents();
         int eventCount = targetModel->getEventCount();
         for (int i = 0; i < eventCount; ++i) {
@@ -951,11 +964,6 @@ MainWindow::setupFileMenu()
     m_keyReference->registerShortcut(action);
     toolbar->addAction(action);
     menu->addAction(action);
-
-    m_propagateAlignmentAction = new QAction(tr("Copy Score Alignment from First Recording"), this);
-    connect(m_propagateAlignmentAction, SIGNAL(triggered()), this, SLOT(propagateAlignmentFromReference()));
-    connect(this, SIGNAL(canPropagateAlignment(bool)), m_propagateAlignmentAction, SLOT(setEnabled(bool)));
-    menu->addAction(m_propagateAlignmentAction);
 
     menu->addSeparator();
 
@@ -2807,6 +2815,11 @@ MainWindow::scorePageUpButtonClicked()
 void
 MainWindow::alignButtonClicked()
 {
+    if (m_chooseSmartCopyAction && m_chooseSmartCopyAction->isChecked()) {
+        propagateAlignmentFromReference();
+        return;
+    }
+    
     Fraction start, end;
     ScoreWidget::EventLabel startLabel, endLabel;
     sv_frame_t audioFrameStart = -1, audioFrameEnd = -1;
@@ -4282,18 +4295,50 @@ MainWindow::propagateAlignmentFromReference()
 {
     ModelId audioModelId = m_session.getActiveAudioModel();
     if (audioModelId.isNone()) {
-        SVDEBUG << "MainWindow::copyAlignmentFromReference: No active audio" << endl;
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: No active audio" << endl;
         return;
     }
 
-    if (audioModelId == getMainModelId()) {
-        SVDEBUG << "MainWindow::copyAlignmentFromReference: Active audio *is* reference" << endl;
+    ModelId mainModelId = getMainModelId();
+    if (audioModelId == mainModelId) {
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: Active audio *is* reference" << endl;
         return;
     }
 
-    //!!! handle case where alignment is not yet complete (Model::getAlignmentCompletion)
-
-    m_session.propagateAlignmentFromMain();
+    // We want to be able to handle partial copies. We could do this
+    // by cueing from the selected part of the score, if there is one,
+    // by mapping from that to the reference model, then propagating
+    // the events within that mapped range. Or we could do it by
+    // cueing from a selection within the reference audio, if there is
+    // one. But the latter has the problem that the audio selection
+    // exists in the target audio as well, so it isn't entirely
+    // unambiguous that we mean to propagate from that range of the
+    // reference rather than to that range of the target.
+    //
+    // And we can't really support both score and audio selections, as
+    // we'd have no way to reconcile them if both had a current
+    // selection. We could prioritise, but I think it's probably
+    // simpler and clearer to always use the score selection, and if
+    // there is none, to map everything.
+    
+    if (m_subsetOfScoreSelected) {
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: Subset of score selected" << endl;
+        Fraction start, end;
+        ScoreWidget::EventLabel startLabel, endLabel;
+        m_scoreWidget->getSelection(start, startLabel, end, endLabel);
+        sv_frame_t startFrame, endFrame;
+        auto onsetsLayer = m_session.getOnsetsLayerFromPane
+            (m_session.getReferencePane());
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (onsetsLayer, QString::fromStdString(startLabel), 0.0, startFrame);
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (onsetsLayer, QString::fromStdString(endLabel), 0.0, endFrame);
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: Mapped score labels start = " << startLabel << ", end = " << endLabel << " to frames start = " << startFrame << ", end = " << endFrame << endl;
+        m_session.propagatePartialAlignmentFromMain(startFrame, endFrame);
+    } else {
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: No subset selected" << endl;
+        m_session.propagateAlignmentFromMain();
+    }
 }
 
 void

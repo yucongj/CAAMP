@@ -103,6 +103,12 @@ Session::getPaneContainingOnsetsLayer()
     return getAudioPaneForAudioModel(getActiveAudioModel());
 }
 
+Pane *
+Session::getReferencePane() const
+{
+    return getAudioPaneForAudioModel(m_mainModel);
+}
+
 TimeValueLayer *
 Session::getTempoLayer()
 {
@@ -586,7 +592,16 @@ Session::alignmentComplete()
 void
 Session::propagateAlignmentFromMain()
 {
-    SVDEBUG << "Session::propagateAlignmentFromMain" << endl;
+    propagatePartialAlignmentFromMain(-1, -1);
+}
+
+void
+Session::propagatePartialAlignmentFromMain(sv_frame_t audioFrameStartInMain,
+                                           sv_frame_t audioFrameEndInMain)
+{
+    SVDEBUG << "Session::propagatePartialAlignmentFromMain("
+            << audioFrameStartInMain << ", " << audioFrameEndInMain << ")"
+            << endl;
     
     auto mainOnsetsLayer = getOnsetsLayerFromPane
         (getAudioPaneForAudioModel(m_mainModel),
@@ -632,7 +647,16 @@ Session::propagateAlignmentFromMain()
     m_document->addLayerToView(pane, m_pendingOnsetsLayer);
     setOnsetsLayerProperties(m_pendingOnsetsLayer);
 
-    auto events = mainOnsetsModel->getAllEvents();
+    EventVector events;
+
+    if (audioFrameEndInMain > audioFrameStartInMain) {
+        SVDEBUG << "selecting events from " << audioFrameStartInMain
+                << " to " << audioFrameEndInMain << endl;
+        events = mainOnsetsModel->getEventsWithin
+            (audioFrameStartInMain, audioFrameEndInMain - audioFrameStartInMain);
+    } else {
+        events = mainOnsetsModel->getAllEvents();
+    }
 
     for (auto e : events) {
         sv_frame_t mapped = activeModel->alignFromReference(e.getFrame());

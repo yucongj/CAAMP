@@ -52,6 +52,8 @@ public:
 
     sv::ModelId getActiveAudioModel() const;
     QString getActiveAudioTitle() const;
+
+    sv::Pane *getReferencePane() const;
     
     bool exportAlignmentTo(QString filename);
     bool importAlignmentFrom(QString filename);
@@ -86,6 +88,9 @@ public slots:
                                sv::sv_frame_t audioFrameEnd);
 
     void propagateAlignmentFromMain();
+
+    void propagatePartialAlignmentFromMain(sv::sv_frame_t audioFrameStartInMain,
+                                           sv::sv_frame_t audioFrameEndInMain);
     
     void acceptAlignment();
     void rejectAlignment();
