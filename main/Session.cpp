@@ -668,6 +668,7 @@ Session::propagatePartialAlignmentFromMain(sv_frame_t audioFrameStartInMain,
     m_partialAlignmentAudioStart = -1;
     m_partialAlignmentAudioEnd = -1;
 
+    m_pendingOnsetsPane = pane;
     m_audioModelForPendingOnsets = activeModelId;
     
     alignmentComplete();
