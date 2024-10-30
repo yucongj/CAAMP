@@ -871,14 +871,14 @@ MainWindow::setupFileMenu()
     toolbar->addAction(action);
     menu->addAction(action);
 
-    // We want this one to go on the toolbar now, if we add it at all,
-    // but on the menu later
-    QAction *iaction = new QAction(tr("Open Another Recording..."), this);
+    icon = il.load("fileopenmoreaudio");
+    QAction *iaction = new QAction(icon, tr("Open Another Recording..."), this);
     iaction->setShortcut(tr("Ctrl+I"));
     iaction->setStatusTip(tr("Import an extra audio file into a new pane"));
     connect(iaction, SIGNAL(triggered()), this, SLOT(importMoreAudio()));
     connect(this, SIGNAL(canImportMoreAudio(bool)), iaction, SLOT(setEnabled(bool)));
     m_keyReference->registerShortcut(iaction);
+    toolbar->addAction(iaction);
     menu->addAction(iaction);
     
 /*!!!
@@ -3099,7 +3099,7 @@ MainWindow::alignmentReadyForReview(Pane *onsetsPane, Layer *onsetsLayer)
     SVDEBUG << "MainWindow::alignmentReadyForReview" << endl;
 
     if (!onsetsPane || !onsetsLayer) {
-        SVDEBUG << "MainWindow::alignmentReadyForReview: no pane or layer provided" << endl;
+        SVDEBUG << "MainWindow::alignmentReadyForReview: no pane and/or layer provided" << endl;
         return;
     }
 
