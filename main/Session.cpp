@@ -902,9 +902,10 @@ Session::importAlignmentFrom(QString path)
 {
     SVDEBUG << "Session::importAlignmentFrom(" << path << ")" << endl;
 
-    auto mainModel = ModelById::get(m_mainModel);
-    if (!mainModel) {
-        SVDEBUG << "Session::importAlignmentFrom: No main model, nothing for the alignment to be an alignment against" << endl;
+    auto audioModelId = getActiveAudioModel();
+    auto audioModel = ModelById::get(audioModelId);
+    if (!audioModel) {
+        SVDEBUG << "Session::importAlignmentFrom: No active audio model" << endl;
         return false;
     }
 
@@ -954,7 +955,7 @@ Session::importAlignmentFrom(QString path)
         format.setColumnPurposes(purposes);
     }
     
-    CSVFileReader reader(path, format, mainModel->getSampleRate(), nullptr);
+    CSVFileReader reader(path, format, audioModel->getSampleRate(), nullptr);
 
     if (!reader.isOK()) {
         SVDEBUG << "Session::importAlignmentFrom: Failed to construct CSV reader: " << reader.getError() << endl;
@@ -974,10 +975,10 @@ Session::importAlignmentFrom(QString path)
         return false;
     }
 
-    auto pane = getAudioPaneForAudioModel(m_mainModel); //!!! or other model?
+    auto pane = getAudioPaneForAudioModel(audioModelId);
     if (!pane) {
         SVDEBUG << "Session::importAlignmentFrom: No audio pane for model "
-                << m_mainModel << endl;
+                << audioModel << endl;
         return false;
     }
     
@@ -1014,7 +1015,7 @@ Session::importAlignmentFrom(QString path)
 
     delete imported;
 
-    recalculateTempoLayerFor(m_mainModel);
+    recalculateTempoLayerFor(audioModelId);
     updateOnsetColours();
     emit alignmentAccepted();    
 
