@@ -5010,7 +5010,7 @@ MainWindow::paneAdded(Pane *pane)
         connect(pane, &Pane::cancelButtonPressed,
                 this, &MainWindow::paneCancelButtonPressed);
         pane->setPlaybackFrameAligner(m_scoreBasedFrameAligner);
-        pane->setPlaybackFollow(PlaybackScrollPage);
+        pane->setPlaybackFollow(PlaybackScrollPageWithCentre);
     }
 }    
 
@@ -6010,7 +6010,7 @@ MainWindow::currentPaneChanged(Pane *pane)
     }
 
     m_session.setActivePane(pane);
-
+    
     if (wasPlaying) {
         if (scoreLabel != "") {
             m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
