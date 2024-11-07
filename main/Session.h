@@ -55,6 +55,7 @@ public:
 
     sv::Pane *getReferencePane() const;
     
+    bool canExportAlignment() const;
     bool exportAlignmentTo(QString filename);
     bool importAlignmentFrom(QString filename);
 

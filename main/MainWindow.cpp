@@ -3739,9 +3739,12 @@ MainWindow::updateMenuStates()
                                m_scoreAlignmentFile != "" &&
                                m_scoreAlignmentModified);
     
-    emit canSaveScoreAlignmentAs(scoreAlignmentOK);
+    emit canSaveScoreAlignmentAs(scoreAlignmentOK &&
+                                 m_session.canExportAlignment());
+    
     emit canLoadScoreAlignment(true);
 
+    // This refers to the audio-to-audio alignment using MATCH
     bool activeModelAlignmentComplete = false;
     if (!activeModelId.isNone()) {
         auto activeModel = ModelById::get(activeModelId);

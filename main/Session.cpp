@@ -840,6 +840,14 @@ Session::mergeLayers(TimeInstantLayer *from, TimeInstantLayer *to,
 }
 
 bool
+Session::canExportAlignment() const
+{
+    auto modelId = getActiveAudioModel();
+    return (!modelId.isNone() &&
+            m_featureData.find(modelId) != m_featureData.end());
+}
+
+bool
 Session::exportAlignmentTo(QString path)
 {
     if (QFileInfo(path).suffix() == "") {
