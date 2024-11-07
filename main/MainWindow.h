@@ -281,7 +281,7 @@ protected:
     QAction                 *m_scrollLeftAction;
     QAction                 *m_scrollRightAction;
     QAction                 *m_showPropertyBoxesAction;
-    QAction                 *m_propagateAlignmentAction;
+    QAction                 *m_chooseSmartCopyAction;
 
     bool                     m_soloModified;
     bool                     m_prevSolo;

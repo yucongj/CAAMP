@@ -47,17 +47,21 @@ public:
     sv::Pane *getPaneContainingOnsetsLayer();
     sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *pane) const;
     
-    sv::TimeValueLayer *getTempoLayer();
-    sv::Pane *getPaneContainingTempoLayer();
+    sv::TimeValueLayer *getTempoLayerForAudioModel(sv::ModelId);
+    sv::Pane *getPaneContainingTempoLayers();
 
     sv::ModelId getActiveAudioModel() const;
     QString getActiveAudioTitle() const;
+
+    sv::Pane *getReferencePane() const;
     
     bool exportAlignmentTo(QString filename);
     bool importAlignmentFrom(QString filename);
 
     void setMusicalEvents(const Score::MusicalEventList &musicalEvents);
 
+    static const sv::TransformId smartCopyTransformId;
+                                                                       
 public slots:
     void setDocument(sv::Document *,
                      sv::Pane *topAudioPane,
@@ -84,6 +88,9 @@ public slots:
                                sv::sv_frame_t audioFrameEnd);
 
     void propagateAlignmentFromMain();
+
+    void propagatePartialAlignmentFromMain(sv::sv_frame_t audioFrameStartInMain,
+                                           sv::sv_frame_t audioFrameEndInMain);
     
     void acceptAlignment();
     void rejectAlignment();
@@ -125,8 +132,16 @@ private:
     sv::Pane *m_pendingOnsetsPane;
     sv::TimeInstantLayer *m_pendingOnsetsLayer;
     sv::ModelId m_audioModelForPendingOnsets;
+
+    Score::MusicalEventList m_musicalEvents;
+
+    struct FeatureData {
+        std::vector<AlignmentEntry> alignmentEntries;
+        sv::TimeValueLayer *tempoLayer;
+    };
     
-    sv::TimeValueLayer *m_tempoLayer;
+    // map from audio model ID to feature data
+    std::map<sv::ModelId, FeatureData> m_featureData;
 
     bool m_inEditMode;
 
@@ -144,15 +159,13 @@ private:
     void alignmentComplete();
     void mergeLayers(sv::TimeInstantLayer *from, sv::TimeInstantLayer *to,
                      sv::sv_frame_t overlapStart, sv::sv_frame_t overlapEnd);
-    void recalculateTempoLayer();
+    void recalculateTempoLayerFor(sv::ModelId audioModel);
     void updateOnsetColours();
 
-    void resetAlignmentEntries();
-    bool updateAlignmentEntries();
-    bool exportAlignmentEntriesTo(QString path);
-
-    Score::MusicalEventList m_musicalEvents;
-    std::vector<AlignmentEntry> m_alignmentEntries;
+    void resetAllAlignmentEntries();
+    void resetAlignmentEntriesFor(sv::ModelId audioModel);
+    bool updateAlignmentEntriesFor(sv::ModelId audioModel);
+    bool exportAlignmentEntries(sv::ModelId fromAudioModel, QString toFilePath);
 };
 
 #endif

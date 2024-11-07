@@ -249,10 +249,27 @@ public:
         //!!! this is doing the same query as in
         //!!! mapToScoreLabelAndProportion all over again)
 
+        if (!layer) {
+            return; // leave frame unchanged
+        }
+        
         frame = 0;
         
         ModelId targetId = layer->getModel();
-        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetId);
+        mapFromScoreLabelAndProportion(targetId, label, proportion, frame);
+    }
+
+    void mapFromScoreLabelAndProportion(ModelId targetModelId,
+                                        QString label,
+                                        double proportion,
+                                        sv_frame_t &frame) const
+    {
+        frame = 0;
+        auto targetModel = ModelById::getAs<SparseOneDimensionalModel>(targetModelId);
+        if (!targetModel) {
+            SVDEBUG << "ERROR: mapFromScoreLabelAndProportion: model is not a SparseOneDimensionalModel" << endl;
+            return;
+        }
         auto events = targetModel->getAllEvents();
         int eventCount = targetModel->getEventCount();
         for (int i = 0; i < eventCount; ++i) {
@@ -304,6 +321,7 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_recordAction(nullptr),
     m_playSelectionAction(nullptr),
     m_playLoopAction(nullptr),
+    m_chooseSmartCopyAction(nullptr),
     m_soloModified(false),
     m_prevSolo(false),
     m_playControlsSpacer(nullptr),
@@ -393,6 +411,8 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_alignButton->setMinimumWidth(alignButtonWidth);
     connect(m_alignButton, SIGNAL(clicked()),
             this, SLOT(alignButtonClicked()));
+    connect(this, SIGNAL(canAlign(bool)),
+            m_alignButton, SLOT(setEnabled(bool)));
     m_alignButton->setEnabled(false);
     m_subsetOfScoreSelected = false;
 
@@ -851,14 +871,14 @@ MainWindow::setupFileMenu()
     toolbar->addAction(action);
     menu->addAction(action);
 
-    // We want this one to go on the toolbar now, if we add it at all,
-    // but on the menu later
-    QAction *iaction = new QAction(tr("Open Another Recording..."), this);
+    icon = il.load("fileopenmoreaudio");
+    QAction *iaction = new QAction(icon, tr("Open Another Recording..."), this);
     iaction->setShortcut(tr("Ctrl+I"));
     iaction->setStatusTip(tr("Import an extra audio file into a new pane"));
     connect(iaction, SIGNAL(triggered()), this, SLOT(importMoreAudio()));
     connect(this, SIGNAL(canImportMoreAudio(bool)), iaction, SLOT(setEnabled(bool)));
     m_keyReference->registerShortcut(iaction);
+    toolbar->addAction(iaction);
     menu->addAction(iaction);
     
 /*!!!
@@ -944,11 +964,6 @@ MainWindow::setupFileMenu()
     m_keyReference->registerShortcut(action);
     toolbar->addAction(action);
     menu->addAction(action);
-
-    m_propagateAlignmentAction = new QAction(tr("Copy Score Alignment from First Recording"), this);
-    connect(m_propagateAlignmentAction, SIGNAL(triggered()), this, SLOT(propagateAlignmentFromReference()));
-    connect(this, SIGNAL(canPropagateAlignment(bool)), m_propagateAlignmentAction, SLOT(setEnabled(bool)));
-    menu->addAction(m_propagateAlignmentAction);
 
     menu->addSeparator();
 
@@ -2800,6 +2815,11 @@ MainWindow::scorePageUpButtonClicked()
 void
 MainWindow::alignButtonClicked()
 {
+    if (m_chooseSmartCopyAction && m_chooseSmartCopyAction->isChecked()) {
+        propagateAlignmentFromReference();
+        return;
+    }
+    
     Fraction start, end;
     ScoreWidget::EventLabel startLabel, endLabel;
     sv_frame_t audioFrameStart = -1, audioFrameEnd = -1;
@@ -2941,7 +2961,7 @@ MainWindow::actOnScoreLocation(Fraction location,
 }
 
 void
-MainWindow::scoreInteractionEnded(ScoreWidget::InteractionMode mode)
+MainWindow::scoreInteractionEnded(ScoreWidget::InteractionMode)
 {
     TimeInstantLayer *targetLayer = m_session.getOnsetsLayer();
     if (targetLayer) {
@@ -3005,6 +3025,9 @@ MainWindow::populateScoreAlignerChoiceMenu()
     if (settings.contains(preferredTransformKey)) {
         TransformId id = settings.value
             (preferredTransformKey, defaultId).toString();
+        if (id == Session::smartCopyTransformId) {
+            id = defaultId;
+        }
         bool found = false;
         for (const auto &t : transforms) {
             if (t.identifier == id) {
@@ -3038,6 +3061,13 @@ MainWindow::populateScoreAlignerChoiceMenu()
         action->setChecked(t.identifier == defaultId);
         alignerGroup->addAction(action);
     }
+    m_chooseSmartCopyAction = menu->addAction(tr("Smart Copy from First Recording"), [=]() {
+        scoreAlignerChosen(Session::smartCopyTransformId);
+    });
+    m_chooseSmartCopyAction->setData(Session::smartCopyTransformId);
+    m_chooseSmartCopyAction->setCheckable(true);
+    m_chooseSmartCopyAction->setChecked(false);
+    alignerGroup->addAction(m_chooseSmartCopyAction);
     m_alignerChoice->setMenu(menu);
 }
 
@@ -3053,10 +3083,12 @@ MainWindow::scoreAlignerChosen(TransformId id)
     QString preferredTransformKey = "transformId";
     settings.setValue(preferredTransformKey, id);
     settings.endGroup();
+
+    updateMenuStates();
 }
 
 void
-MainWindow::layerAdded(Layer *layer)
+MainWindow::layerAdded(Layer *)
 {
     SVDEBUG << "MainWindow::layerAdded" << endl;
 }
@@ -3067,7 +3099,7 @@ MainWindow::alignmentReadyForReview(Pane *onsetsPane, Layer *onsetsLayer)
     SVDEBUG << "MainWindow::alignmentReadyForReview" << endl;
 
     if (!onsetsPane || !onsetsLayer) {
-        SVDEBUG << "MainWindow::alignmentReadyForReview: no pane or layer provided" << endl;
+        SVDEBUG << "MainWindow::alignmentReadyForReview: no pane and/or layer provided" << endl;
         return;
     }
 
@@ -3654,10 +3686,6 @@ MainWindow::updateMenuStates()
     bool alignMode = m_viewManager && m_viewManager->getAlignMode();
     emit canChangeSolo(havePlayTarget && !alignMode);
 
-    if (TransformFactory::getInstance()->havePopulatedInstalledTransforms()) {
-        emit canAlign(havePlayTarget && m_document && m_document->canAlign());
-    }
-
     emit canChangePlaybackSpeed(true);
     int v = m_playSpeed->value();
     emit canSpeedUpPlayback(v < m_playSpeed->maximum());
@@ -3699,9 +3727,12 @@ MainWindow::updateMenuStates()
     bool haveMainModel =
         (!mainModelId.isNone());
 
-    bool scoreAlignmentOK =
+    bool haveScore =
         haveMainModel &&
-        m_scoreId != "" &&
+        m_scoreId != "";
+
+    bool scoreAlignmentOK =
+        haveScore &&
         m_scoreAlignmentAccepted;
     
     emit canSaveScoreAlignment(scoreAlignmentOK &&
@@ -3721,11 +3752,20 @@ MainWindow::updateMenuStates()
     }
 
     SVDEBUG << "for canPropagateAlignment: scoreAlignmentOK = " << scoreAlignmentOK << ", activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
+
+    bool canPropagate =
+        haveScore &&
+        !activeModelId.isNone() &&
+        activeModelId != mainModelId &&
+        activeModelAlignmentComplete;
     
-    emit canPropagateAlignment(scoreAlignmentOK &&
-                               !activeModelId.isNone() &&
-                               activeModelId != mainModelId &&
-                               activeModelAlignmentComplete);
+    emit canPropagateAlignment(canPropagate);
+    
+    if (m_chooseSmartCopyAction && m_chooseSmartCopyAction->isChecked()) {
+        emit canAlign(haveScore && canPropagate);
+    } else {
+        emit canAlign(haveScore);
+    }
     
     updateAlignButtonText();
 }
@@ -4255,18 +4295,50 @@ MainWindow::propagateAlignmentFromReference()
 {
     ModelId audioModelId = m_session.getActiveAudioModel();
     if (audioModelId.isNone()) {
-        SVDEBUG << "MainWindow::copyAlignmentFromReference: No active audio" << endl;
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: No active audio" << endl;
         return;
     }
 
-    if (audioModelId == getMainModelId()) {
-        SVDEBUG << "MainWindow::copyAlignmentFromReference: Active audio *is* reference" << endl;
+    ModelId mainModelId = getMainModelId();
+    if (audioModelId == mainModelId) {
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: Active audio *is* reference" << endl;
         return;
     }
 
-    //!!! handle case where alignment is not yet complete (Model::getAlignmentCompletion)
-
-    m_session.propagateAlignmentFromMain();
+    // We want to be able to handle partial copies. We could do this
+    // by cueing from the selected part of the score, if there is one,
+    // by mapping from that to the reference model, then propagating
+    // the events within that mapped range. Or we could do it by
+    // cueing from a selection within the reference audio, if there is
+    // one. But the latter has the problem that the audio selection
+    // exists in the target audio as well, so it isn't entirely
+    // unambiguous that we mean to propagate from that range of the
+    // reference rather than to that range of the target.
+    //
+    // And we can't really support both score and audio selections, as
+    // we'd have no way to reconcile them if both had a current
+    // selection. We could prioritise, but I think it's probably
+    // simpler and clearer to always use the score selection, and if
+    // there is none, to map everything.
+    
+    if (m_subsetOfScoreSelected) {
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: Subset of score selected" << endl;
+        Fraction start, end;
+        ScoreWidget::EventLabel startLabel, endLabel;
+        m_scoreWidget->getSelection(start, startLabel, end, endLabel);
+        sv_frame_t startFrame, endFrame;
+        auto onsetsLayer = m_session.getOnsetsLayerFromPane
+            (m_session.getReferencePane());
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (onsetsLayer, QString::fromStdString(startLabel), 0.0, startFrame);
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (onsetsLayer, QString::fromStdString(endLabel), 0.0, endFrame);
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: Mapped score labels start = " << startLabel << ", end = " << endLabel << " to frames start = " << startFrame << ", end = " << endFrame << endl;
+        m_session.propagatePartialAlignmentFromMain(startFrame, endFrame);
+    } else {
+        SVDEBUG << "MainWindow::propagateAlignmentFromReference: No subset selected" << endl;
+        m_session.propagateAlignmentFromMain();
+    }
 }
 
 void
@@ -4938,7 +5010,7 @@ MainWindow::paneAdded(Pane *pane)
         connect(pane, &Pane::cancelButtonPressed,
                 this, &MainWindow::paneCancelButtonPressed);
         pane->setPlaybackFrameAligner(m_scoreBasedFrameAligner);
-        pane->setPlaybackFollow(PlaybackScrollPage);
+        pane->setPlaybackFollow(PlaybackScrollPageWithCentre);
     }
 }    
 
@@ -5881,15 +5953,18 @@ MainWindow::currentPaneChanged(Pane *pane)
     QString scoreLabel;
     double proportion = 0;
     bool wasPlaying = false;
+    sv_frame_t playingFrame = 0;
     if (m_playSource && m_playSource->isPlaying()) {
-        sv_frame_t frame = m_playSource->getCurrentPlayingFrame();
+        playingFrame = m_playSource->getCurrentPlayingFrame();
         m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
-            (m_session.getOnsetsLayer(), frame, scoreLabel, proportion);
+            (m_session.getOnsetsLayer(), playingFrame, scoreLabel, proportion);
         wasPlaying = true;
-        m_playSource->stop();
         SVDEBUG << "currentPaneChanged: mapped current playing frame "
-                << frame << " to score label " << scoreLabel
+                << playingFrame << " to score label " << scoreLabel
                 << " and proportion " << proportion << endl;
+        if (scoreLabel != "") {
+            m_playSource->stop();
+        }
     }
 
     MainWindowBase::currentPaneChanged(pane);
@@ -5935,15 +6010,16 @@ MainWindow::currentPaneChanged(Pane *pane)
     }
 
     m_session.setActivePane(pane);
-
+    
     if (wasPlaying) {
-        sv_frame_t frame;
-        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
-            (m_session.getOnsetsLayer(), scoreLabel, proportion, frame);
-        SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
-                << " and proportion " << proportion
-                << " back to playback frame " << frame << endl;
-        m_playSource->play(frame);
+        if (scoreLabel != "") {
+            m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+                (m_session.getOnsetsLayer(), scoreLabel, proportion, playingFrame);
+            SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
+                    << " and proportion " << proportion
+                    << " back to playback frame " << playingFrame << endl;
+            m_playSource->play(playingFrame);
+        }
     }
 
     updateWindowTitle();
@@ -6246,7 +6322,9 @@ MainWindow::updateAlignButtonText()
 {
     bool subsetOfAudioSelected = !m_viewManager->getSelections().empty();
     QString label = tr("Align");
-    if (m_subsetOfScoreSelected) {
+    if (m_chooseSmartCopyAction && m_chooseSmartCopyAction->isChecked()) {
+        label = tr("Smart Copy from First Recording");
+    } else if (m_subsetOfScoreSelected) {
         if (subsetOfAudioSelected) {
             label = tr("Align Selections of Score and Audio");
         } else {

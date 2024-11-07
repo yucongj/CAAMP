@@ -176,9 +176,8 @@ ScoreWidget::loadScoreFile(QString scoreName, QString scoreFile, QString &errorS
         return false;
     }
 
-    std::cout << toolkit.GetOptionUsageString() << std::endl;
-    
-    std::cout << toolkit.GetAvailableOptions() << std::endl;
+//    std::cout << toolkit.GetOptionUsageString() << std::endl;
+//    std::cout << toolkit.GetAvailableOptions() << std::endl;
 
     double myAspectRatio = double(width()) / double(height());
     m_aspectRatioAtLoad = myAspectRatio;
