@@ -3728,19 +3728,18 @@ MainWindow::updateMenuStates()
         (!mainModelId.isNone());
 
     bool haveScore =
-        haveMainModel &&
         m_scoreId != "";
 
-    bool scoreAlignmentOK =
-        haveScore &&
-        m_scoreAlignmentAccepted;
-    
-    emit canSaveScoreAlignment(scoreAlignmentOK &&
+    // Does not depend on actually having an alignment, so we don't
+    // test for m_scoreAlignmentAccepted - we want to be able to
+    // export an empty alignment (with every row showing N/N)
+    emit canSaveScoreAlignmentAs(haveScore &&
+                                 m_session.canExportAlignment());
+
+    emit canSaveScoreAlignment(haveScore &&
+                               m_session.canExportAlignment() &&
                                m_scoreAlignmentFile != "" &&
                                m_scoreAlignmentModified);
-    
-    emit canSaveScoreAlignmentAs(scoreAlignmentOK &&
-                                 m_session.canExportAlignment());
     
     emit canLoadScoreAlignment(true);
 
@@ -3754,10 +3753,11 @@ MainWindow::updateMenuStates()
         }
     }
 
-    SVDEBUG << "for canPropagateAlignment: scoreAlignmentOK = " << scoreAlignmentOK << ", activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
+    SVDEBUG << "for canPropagateAlignment: activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
 
     bool canPropagate =
         haveScore &&
+        haveMainModel &&
         !activeModelId.isNone() &&
         activeModelId != mainModelId &&
         activeModelAlignmentComplete;
@@ -3765,9 +3765,9 @@ MainWindow::updateMenuStates()
     emit canPropagateAlignment(canPropagate);
     
     if (m_chooseSmartCopyAction && m_chooseSmartCopyAction->isChecked()) {
-        emit canAlign(haveScore && canPropagate);
+        emit canAlign(canPropagate);
     } else {
-        emit canAlign(haveScore);
+        emit canAlign(haveScore && haveMainModel);
     }
     
     updateAlignButtonText();

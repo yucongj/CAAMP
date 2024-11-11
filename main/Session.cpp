@@ -1074,13 +1074,18 @@ Session::updateAlignmentEntriesFor(ModelId audioModelId)
                 << audioModelId << endl;
         return false;
     }
+
+    if (m_featureData.find(audioModelId) == m_featureData.end()) {
+        resetAlignmentEntriesFor(audioModelId);
+    }
     
     auto onsetsLayer = getOnsetsLayerFromPane
         (pane, OnsetsLayerSelection::ExcludePendingOnsets);
     if (!onsetsLayer) {
-        SVDEBUG << "Session::updateAlignmentEntriesFor: No onsets layer for model "
-                << audioModelId << endl;
-        return false;
+        SVDEBUG << "Session::updateAlignmentEntriesFor: NOTE: No onsets layer for model " << audioModelId << endl;
+        // This is actually fine, it just means the alignment is
+        // effectively empty
+        return true;
     }
 
     shared_ptr<SparseOneDimensionalModel> onsetsModel =
@@ -1091,9 +1096,6 @@ Session::updateAlignmentEntriesFor(ModelId audioModelId)
         return false;
     }
 
-    if (m_featureData.find(audioModelId) == m_featureData.end()) {
-        resetAlignmentEntriesFor(audioModelId);
-    }
     auto &alignmentEntries = m_featureData.at(audioModelId).alignmentEntries;
     int n = alignmentEntries.size();
     
