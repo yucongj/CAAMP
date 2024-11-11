@@ -55,11 +55,16 @@ public:
 
     sv::Pane *getReferencePane() const;
     
-    bool canExportAlignment() const;
+    bool canExportAlignment() const; // for "Save As"
+    bool canReExportAlignment() const; // for "Save"
+    
     bool exportAlignmentTo(QString filename);
+    bool reExportAlignment();
+    
     bool importAlignmentFrom(QString filename);
 
-    void setMusicalEvents(const Score::MusicalEventList &musicalEvents);
+    void setMusicalEvents(QString scoreId,
+                          const Score::MusicalEventList &musicalEvents);
 
     static const sv::TransformId smartCopyTransformId;
                                                                        
@@ -73,7 +78,7 @@ public slots:
     
     void unsetDocument();
     
-    void setMainModel(sv::ModelId modelId, QString scoreId);
+    void setMainModel(sv::ModelId modelId);
 
     void setActivePane(sv::Pane *);
     
@@ -139,6 +144,8 @@ private:
     struct FeatureData {
         std::vector<AlignmentEntry> alignmentEntries;
         sv::TimeValueLayer *tempoLayer;
+        QString lastExportedTo;
+        bool alignmentModified;
     };
     
     // map from audio model ID to feature data

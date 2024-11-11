@@ -333,7 +333,6 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_keyReference(new KeyReference()),
     m_templateWatcher(nullptr),
     m_shouldStartOSCQueue(false),
-    m_scoreAlignmentModified(false),
     m_followScore(true),
     m_scoreBasedFrameAligner(new ScoreBasedFrameAligner(&m_session))
 {
@@ -432,7 +431,6 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
         (IconLoader().load("dataaccept"), tr("Accept Alignment"));
     connect(m_alignAcceptButton, SIGNAL(clicked()),
             &m_session, SLOT(acceptAlignment()));
-    m_scoreAlignmentAccepted = false;
 
     m_alignRejectButton = new QPushButton
         (IconLoader().load("datadelete"), tr("Reject Alignment"));
@@ -2642,8 +2640,6 @@ MainWindow::openScoreFile(QString scoreName, QString scoreFile)
     settings.endGroup();
 
     newSession();
-    m_scoreAlignmentFile = "";
-    m_scoreAlignmentModified = false;
     m_score = Score();
 
     // Creating score structure
@@ -2677,7 +2673,7 @@ MainWindow::openScoreFile(QString scoreName, QString scoreFile)
         SVCERR << "MainWindow::chooseScore: Failed to load meter data from meter file path \"" << meterPath << "\"" << endl;
         return;
     }
-    m_session.setMusicalEvents(m_score.getMusicalEvents());
+    m_session.setMusicalEvents(m_scoreId, m_score.getMusicalEvents());
     m_scoreWidget->setMusicalEvents(m_score.getMusicalEvents());
 
     auto recordingDirectory =
@@ -3109,7 +3105,6 @@ MainWindow::alignmentReadyForReview(Pane *onsetsPane, Layer *onsetsLayer)
     
     m_alignCommands->hide();
     m_alignAcceptReject->show();
-    m_scoreAlignmentAccepted = false;
 
     updateMenuStates();
 }
@@ -3119,7 +3114,6 @@ MainWindow::alignmentModified()
 {
     SVDEBUG << "MainWindow::alignmentModified" << endl;
 
-    m_scoreAlignmentModified = true;
     updateMenuStates();
 }
 
@@ -3140,9 +3134,6 @@ MainWindow::alignmentAccepted()
     }
 
     m_paneStack->setCurrentLayer(onsetsPane, onsetsLayer);
-
-    m_scoreAlignmentModified = true;
-    m_scoreAlignmentAccepted = true;
 
     updateMenuStates();
 }
@@ -3730,16 +3721,11 @@ MainWindow::updateMenuStates()
     bool haveScore =
         m_scoreId != "";
 
-    // Does not depend on actually having an alignment, so we don't
-    // test for m_scoreAlignmentAccepted - we want to be able to
-    // export an empty alignment (with every row showing N/N)
-    emit canSaveScoreAlignmentAs(haveScore &&
-                                 m_session.canExportAlignment());
-
-    emit canSaveScoreAlignment(haveScore &&
-                               m_session.canExportAlignment() &&
-                               m_scoreAlignmentFile != "" &&
-                               m_scoreAlignmentModified);
+    // NB this does not depend on actually having an alignment - we
+    // want to be able to export an empty alignment (with every row
+    // showing N/N)
+    emit canSaveScoreAlignmentAs(m_session.canExportAlignment());
+    emit canSaveScoreAlignment(m_session.canReExportAlignment());
     
     emit canLoadScoreAlignment(true);
 
@@ -4242,9 +4228,6 @@ MainWindow::loadScoreAlignment()
                              tr("Failed to import alignment"),
                              tr("Failed to import alignment. See log file for more information."),
                              QMessageBox::Ok);
-    } else {
-        m_scoreAlignmentFile = filename;
-        m_scoreAlignmentModified = false;
     }
 }
 
@@ -4253,17 +4236,13 @@ MainWindow::saveScoreAlignment()
 {
     SVDEBUG << "MainWindow::saveScoreAlignment" << endl;
 
-    if (m_scoreAlignmentFile != "") {
-    
-        if (!m_session.exportAlignmentTo(m_scoreAlignmentFile)) {
+    if (m_session.canReExportAlignment()) {
+        if (!m_session.reExportAlignment()) {
             QMessageBox::warning(this,
                                  tr("Failed to export alignment"),
                                  tr("Failed to export alignment. See log file for more information."),
                                  QMessageBox::Ok);
-        } else {
-            m_scoreAlignmentModified = false;
         }
-        
     } else {
         saveScoreAlignmentAs();
     }
@@ -4287,10 +4266,6 @@ MainWindow::saveScoreAlignmentAs()
                              tr("Failed to export alignment"),
                              tr("Failed to export alignment. See log file for more information."),
                              QMessageBox::Ok);
-        m_scoreAlignmentFile = "";
-    } else {
-        m_scoreAlignmentFile = filename;
-        m_scoreAlignmentModified = false;
     }
 
     updateMenuStates();
@@ -6313,13 +6288,9 @@ MainWindow::mainModelChanged(ModelId modelId)
     zoomToFit();
     rewindStart();
 
-    m_scoreAlignmentFile = "";
-    m_scoreAlignmentModified = false;
-    m_scoreAlignmentAccepted = false;
-    
     SVDEBUG << "MainWindow::mainModelChanged: Now calling m_session.setMainModel" << endl;
 
-    m_session.setMainModel(modelId, m_scoreId);
+    m_session.setMainModel(modelId);
     m_alignButton->setEnabled(!modelId.isNone());
 }
 
