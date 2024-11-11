@@ -359,6 +359,9 @@ Session::getActiveAudioTitle() const
 ModelId
 Session::getActiveAudioModel() const
 {
+    SVDEBUG << "Session::getActiveAudioModel: we have " << m_audioPanes.size()
+            << " audio panes" << endl;
+    
     if (m_activePane) {
 
         // Check against the audio panes, because it might not be one

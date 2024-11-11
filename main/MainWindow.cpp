@@ -3920,6 +3920,9 @@ MainWindow::importMoreAudio()
     }
 
     m_session.addFurtherAudioPane(pane);
+
+    updateWindowTitle();
+    updateMenuStates();
 }
 
 void
