@@ -5004,6 +5004,7 @@ MainWindow::paneHidden(Pane *pane)
 void
 MainWindow::paneAboutToBeDeleted(Pane *pane)
 {
+    SVDEBUG << "MainWindow::paneAboutToBeDeleted(" << pane << ")" << endl;
     if (m_overview) m_overview->unregisterView(pane); 
 }    
 
