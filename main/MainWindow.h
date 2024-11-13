@@ -310,9 +310,6 @@ protected:
     QString                  m_scoreId;
     Session                  m_session;
     Score                    m_score;
-    QString                  m_scoreAlignmentFile;
-    bool                     m_scoreAlignmentModified;
-    bool                     m_scoreAlignmentAccepted;
     bool                     m_followScore;
 
     class ScoreBasedFrameAligner;

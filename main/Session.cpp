@@ -58,9 +58,12 @@ Session::setDocument(Document *doc,
     if (m_pendingOnsetsLayer) {
         emit alignmentRejected();
     }
+
+    // Don't reset the score id or musical events - they can outlast
+    // the document, and indeed are usually present before the
+    // document is first set
     
     m_document = doc;
-    m_scoreId = "";
     m_mainModel = {};
 
     m_audioPanes.clear();
@@ -77,7 +80,7 @@ Session::setDocument(Document *doc,
     m_pendingOnsetsPane = nullptr;
     m_pendingOnsetsLayer = nullptr;
     m_audioModelForPendingOnsets = {};
-    
+
     m_featureData.clear();
     m_inEditMode = false;
 }
@@ -124,12 +127,11 @@ Session::getPaneContainingTempoLayers()
 }
 
 void
-Session::setMainModel(ModelId modelId, QString scoreId)
+Session::setMainModel(ModelId modelId)
 {
     SVDEBUG << "Session::setMainModel(" << modelId << ")" << endl;
     
     m_mainModel = modelId;
-    m_scoreId = scoreId;
 
     if (!m_document) {
         if (m_mainModel.isNone()) {
@@ -359,6 +361,9 @@ Session::getActiveAudioTitle() const
 ModelId
 Session::getActiveAudioModel() const
 {
+    SVDEBUG << "Session::getActiveAudioModel: we have " << m_audioPanes.size()
+            << " audio panes" << endl;
+    
     if (m_activePane) {
 
         // Check against the audio panes, because it might not be one
@@ -631,15 +636,18 @@ Session::modelChanged(ModelId id)
 {
     SVDEBUG << "Session::modelChanged: model is " << id << endl;
 
-    auto mainOnsetsLayer = getOnsetsLayerFromPane
-        (getAudioPaneForAudioModel(m_mainModel),
-         OnsetsLayerSelection::PermitPendingOnsets);
-    
-    if (mainOnsetsLayer && id == mainOnsetsLayer->getModel()) {
-        recalculateTempoLayerFor(id);
-    }
+    for (auto &p : m_audioPanes) {
 
-    emit alignmentModified();
+        auto onsetsLayer =
+            getOnsetsLayerFromPane(p, OnsetsLayerSelection::PermitPendingOnsets);
+        auto audioModelId =
+            getAudioModelFromPane(p);
+
+        if (onsetsLayer && !audioModelId.isNone()) {
+            recalculateTempoLayerFor(audioModelId);
+            emit alignmentModified();
+        }
+    }
 }
 
 void
@@ -840,6 +848,50 @@ Session::mergeLayers(TimeInstantLayer *from, TimeInstantLayer *to,
 }
 
 bool
+Session::canExportAlignment() const
+{
+    if (m_scoreId == "") {
+        SVDEBUG << "Session::canExportAlignment: No, no score ID set" << endl;
+        return false;
+    }
+    if (m_musicalEvents.empty()) {
+        SVDEBUG << "Session::canExportAlignment: No, no musical events set" << endl;
+        return false;
+    }
+    auto modelId = getActiveAudioModel();
+    if (modelId.isNone()) {
+        SVDEBUG << "Session::canExportAlignment: No, no active audio model" << endl;
+        return false;
+    }
+    if (m_featureData.find(modelId) == m_featureData.end()) {
+        SVDEBUG << "Session::canExportAlignment: No, no feature data" << endl;
+        return false;
+    }
+    SVDEBUG << "Session::canExportAlignment: Yes" << endl;
+    return true;
+}
+
+bool
+Session::canReExportAlignment() const
+{
+    if (!canExportAlignment()) {
+        return false;
+    }
+    auto modelId = getActiveAudioModel();
+    if (m_featureData.at(modelId).lastExportedTo == "") {
+        SVDEBUG << "Session::canReExportAlignment: No, we have no filename"
+                << endl;
+        return false;
+    }
+    if (!m_featureData.at(modelId).alignmentModified) {
+        SVDEBUG << "Session::canReExportAlignment: No, it hasn't been modified"
+                << endl;
+        return false;
+    }
+    return true;
+}
+    
+bool
 Session::exportAlignmentTo(QString path)
 {
     if (QFileInfo(path).suffix() == "") {
@@ -851,6 +903,21 @@ Session::exportAlignmentTo(QString path)
         success = exportAlignmentEntries(getActiveAudioModel(), path);
     }
     return success;
+}
+
+bool
+Session::reExportAlignment()
+{
+    auto modelId = getActiveAudioModel();
+    if (m_featureData.find(modelId) == m_featureData.end()) {
+        SVDEBUG << "Session::reExportAlignment: No feature data found for audio model" << endl;
+        return false;
+    }
+    if (m_featureData.at(modelId).lastExportedTo == "") {
+        SVDEBUG << "Session::reExportAlignment: No filename" << endl;
+        return false;
+    }
+    return exportAlignmentTo(m_featureData.at(modelId).lastExportedTo);
 }
 
 bool
@@ -894,6 +961,10 @@ Session::exportAlignmentEntries(ModelId modelId, QString path)
 
     file.close();
     temp.moveToTarget();
+
+    m_featureData.at(modelId).lastExportedTo = path;
+    m_featureData.at(modelId).alignmentModified = false;
+        
     return true;
 }
 
@@ -1021,13 +1092,15 @@ Session::importAlignmentFrom(QString path)
 
     connect(existingModel.get(), SIGNAL(modelChanged(ModelId)),
             this, SLOT(modelChanged(ModelId)));
-
+        
     return true;
 }
 
 void
-Session::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
+Session::setMusicalEvents(QString scoreId,
+                          const Score::MusicalEventList &musicalEvents)
 {
+    m_scoreId = scoreId;
     m_musicalEvents = musicalEvents;
     resetAllAlignmentEntries();
 }
@@ -1044,7 +1117,12 @@ void
 Session::resetAlignmentEntriesFor(ModelId model)
 {
     if (m_featureData.find(model) == m_featureData.end()) {
-        m_featureData[model] = { {}, nullptr };
+        m_featureData[model] = {
+            {},                 // alignmentEntries
+            nullptr,            // tempoLayer
+            {},                 // lastExportedTo
+            false               // alignmentModified
+        };
     } else {
         m_featureData.at(model).alignmentEntries.clear();
     }
@@ -1066,13 +1144,18 @@ Session::updateAlignmentEntriesFor(ModelId audioModelId)
                 << audioModelId << endl;
         return false;
     }
+
+    if (m_featureData.find(audioModelId) == m_featureData.end()) {
+        resetAlignmentEntriesFor(audioModelId);
+    }
     
     auto onsetsLayer = getOnsetsLayerFromPane
         (pane, OnsetsLayerSelection::ExcludePendingOnsets);
     if (!onsetsLayer) {
-        SVDEBUG << "Session::updateAlignmentEntriesFor: No onsets layer for model "
-                << audioModelId << endl;
-        return false;
+        SVDEBUG << "Session::updateAlignmentEntriesFor: NOTE: No onsets layer for model " << audioModelId << endl;
+        // This is actually fine, it just means the alignment is
+        // effectively empty
+        return true;
     }
 
     shared_ptr<SparseOneDimensionalModel> onsetsModel =
@@ -1083,9 +1166,6 @@ Session::updateAlignmentEntriesFor(ModelId audioModelId)
         return false;
     }
 
-    if (m_featureData.find(audioModelId) == m_featureData.end()) {
-        resetAlignmentEntriesFor(audioModelId);
-    }
     auto &alignmentEntries = m_featureData.at(audioModelId).alignmentEntries;
     int n = alignmentEntries.size();
     
@@ -1125,6 +1205,8 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
         m_featureData[audioModel] = { {}, nullptr };
     }
 
+    m_featureData.at(audioModel).alignmentModified = true;
+
     if (!m_featureData.at(audioModel).tempoLayer) {
         tempoLayer = qobject_cast<TimeValueLayer *>
             (m_document->createLayer(LayerFactory::TimeValues));
@@ -1142,7 +1224,7 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
     tempoModel->setSourceModel(audioModel);
     m_document->addNonDerivedModel(tempoModelId);
     m_document->setModel(tempoLayer, tempoModelId);
-
+    
     auto audioPane = getAudioPaneForAudioModel(audioModel);
     if (!audioPane) {
         SVDEBUG << "Session::recalculateTempoLayer: No audio pane for model "
