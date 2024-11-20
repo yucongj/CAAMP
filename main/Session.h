@@ -81,6 +81,8 @@ public slots:
     void setMainModel(sv::ModelId modelId);
 
     void setActivePane(sv::Pane *);
+
+    void paneRemoved(sv::Pane *);
     
     void setAlignmentTransformId(sv::TransformId transformId);
     

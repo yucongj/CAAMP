@@ -130,6 +130,11 @@ void
 Session::setMainModel(ModelId modelId)
 {
     SVDEBUG << "Session::setMainModel(" << modelId << ")" << endl;
+
+    if (m_mainModel == modelId) {
+        SVDEBUG << "Session::setMainModel: we already have it" << endl;
+        return;
+    }
     
     m_mainModel = modelId;
 
@@ -148,17 +153,19 @@ Session::setMainModel(ModelId modelId)
         return;
     }
 
-    m_document->addLayerToView(m_featurePane, m_timeRulerLayer);
+    if (m_featurePane) {
+        m_document->addLayerToView(m_featurePane, m_timeRulerLayer);
     
-    ColourDatabase *cdb = ColourDatabase::getInstance();
+        ColourDatabase *cdb = ColourDatabase::getInstance();
 
-    WaveformLayer *waveformLayer = qobject_cast<WaveformLayer *>
-        (m_document->createLayer(LayerFactory::Waveform));
-    waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
+        WaveformLayer *waveformLayer = qobject_cast<WaveformLayer *>
+            (m_document->createLayer(LayerFactory::Waveform));
+        waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
     
-    m_document->addLayerToView(m_featurePane, waveformLayer);
-    m_document->setModel(waveformLayer, modelId);
-
+        m_document->addLayerToView(m_featurePane, waveformLayer);
+        m_document->setModel(waveformLayer, modelId);
+    }
+    
     SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
         (m_document->createLayer(LayerFactory::MelodicRangeSpectrogram));
     spectrogramLayer->setBinScale(BinScale::Linear);
@@ -172,6 +179,55 @@ Session::setMainModel(ModelId modelId)
     resetAlignmentEntriesFor(modelId);
 }
 
+void
+Session::paneRemoved(Pane *pane)
+{
+    if (m_featurePane == pane) {
+        SVDEBUG << "Session::paneRemoved: it's the feature pane" << endl;
+        m_featurePane = nullptr;
+        return;
+    }
+    
+    vector<Pane *> remainingPanes;
+    ModelId modelToBeDeleted = getAudioModelFromPane(pane);
+    bool isReference = (modelToBeDeleted == m_mainModel);
+
+    SVDEBUG << "Session::paneRemoved: pane = " << pane
+            << ", modelToBeDeleted = " << modelToBeDeleted
+            << ", isReference = " << isReference << endl;
+    
+    ModelId newMainModel = m_mainModel;
+
+    for (Pane *p : m_audioPanes) {
+        if (p != pane) {
+            remainingPanes.push_back(p);
+            if (newMainModel == modelToBeDeleted) {
+                auto modelId = getAudioModelFromPane(p);
+                if (modelId != modelToBeDeleted) {
+                    newMainModel = modelId;
+                }
+            }
+        }
+    }
+
+    m_audioPanes = remainingPanes;
+
+    if (newMainModel == modelToBeDeleted) {
+        newMainModel = {};
+        SVDEBUG << "Session::paneRemoved: it's the main model pane being deleted, but we have no other model to be the main one" << endl;
+    }
+
+    SVDEBUG << "Session::paneRemoved: switching main model to " << newMainModel << endl;
+    m_mainModel = newMainModel;
+    if (m_document) {
+        m_document->switchMainModel(m_mainModel);
+    }
+    
+    if (m_activePane == pane) {
+        m_activePane = nullptr;
+    }
+}
+
 ModelId
 Session::getAudioModelFromPane(Pane *pane) const
 {
@@ -181,6 +237,9 @@ Session::getAudioModelFromPane(Pane *pane) const
     
     int n = pane->getLayerCount();
 
+    SVDEBUG << "Session::getAudioModelFromPane: pane = " << pane
+            << ", n = " << n << endl;
+    
     for (int i = n-1; i >= 0; --i) {
 
         // Reverse order, to find whichever is visible (since in the
@@ -188,6 +247,9 @@ Session::getAudioModelFromPane(Pane *pane) const
         
         auto layer = pane->getLayer(i);
 
+        SVDEBUG << "layer " << i << ": " << layer->getLayerPresentationName()
+                << endl;
+        
         auto waveformLayer = qobject_cast<WaveformLayer *>(layer);
         if (waveformLayer) {
             return waveformLayer->getModel();
@@ -326,6 +388,10 @@ Session::setActivePane(Pane *pane)
     
     // Select the associated waveform and tempo curve in the feature
     // pane, hide the rest
+
+    if (!m_featurePane) {
+        return;
+    }
     
     int n = m_featurePane->getLayerCount();
     for (int i = 0; i < n; ++i) {
@@ -361,8 +427,8 @@ Session::getActiveAudioTitle() const
 ModelId
 Session::getActiveAudioModel() const
 {
-    SVDEBUG << "Session::getActiveAudioModel: we have " << m_audioPanes.size()
-            << " audio panes" << endl;
+//    SVDEBUG << "Session::getActiveAudioModel: we have " << m_audioPanes.size()
+//            << " audio panes" << endl;
     
     if (m_activePane) {
 
@@ -370,25 +436,25 @@ Session::getActiveAudioModel() const
         for (auto p: m_audioPanes) {
             if (m_activePane == p) {
                 auto modelId = getAudioModelFromPane(p);
-                SVDEBUG << "Session::getActiveAudioModel: Returning model "
-                        << modelId << " from active pane " << p << endl;
+//                SVDEBUG << "Session::getActiveAudioModel: Returning model "
+//                        << modelId << " from active pane " << p << endl;
                 return modelId;
             }
         }
 
-        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
-                << m_mainModel << " as active pane is not an audio one" << endl;
+//        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
+//                << m_mainModel << " as active pane is not an audio one" << endl;
         return m_mainModel;
     }
 
     if (m_audioPanes.empty()) {
-        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
-                << m_mainModel << " as we have no active pane" << endl;
+//        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
+//                << m_mainModel << " as we have no active pane" << endl;
         return m_mainModel;
     } else {
         auto modelId = getAudioModelFromPane(m_audioPanes[0]);
-        SVDEBUG << "Session::getActiveAudioModel: Returning model "
-                << modelId << " from first pane " << m_audioPanes[0] << endl;
+//        SVDEBUG << "Session::getActiveAudioModel: Returning model "
+//                << modelId << " from first pane " << m_audioPanes[0] << endl;
         return modelId;
     }
 }
@@ -516,8 +582,10 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     if (onsetsLayer) {
         onsetsLayer->showLayer(activeAudioPane, false);
     }
-    if (m_featureData.find(activeModelId) != m_featureData.end()) {
-        m_featurePane->removeLayer(m_featureData.at(activeModelId).tempoLayer);
+    if (m_featurePane) {
+        if (m_featureData.find(activeModelId) != m_featureData.end()) {
+            m_featurePane->removeLayer(m_featureData.at(activeModelId).tempoLayer);
+        }
     }
     
     Transform::ParameterMap params {
@@ -1212,7 +1280,9 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
             (m_document->createLayer(LayerFactory::TimeValues));
         ColourDatabase *cdb = ColourDatabase::getInstance();
         tempoLayer->setBaseColour(cdb->getColourIndex(tr("Blue")));
-        m_document->addLayerToView(m_featurePane, tempoLayer);
+        if (m_featurePane) {
+            m_document->addLayerToView(m_featurePane, tempoLayer);
+        }
         m_featureData[audioModel].tempoLayer = tempoLayer;
     } else {
         tempoLayer = m_featureData.at(audioModel).tempoLayer;

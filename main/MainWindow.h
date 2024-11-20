@@ -140,6 +140,7 @@ protected slots:
     void paneDropAccepted(sv::Pane *, QString) override;
 
     void paneCancelButtonPressed(sv::Layer *);
+    void paneDeleteButtonClicked(sv::Pane *) override;
 
     virtual void setupRecentFilesMenu();
     virtual void setupRecentTransformsMenu();
