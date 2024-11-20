@@ -4751,6 +4751,8 @@ MainWindow::closeSession()
     
     if (!checkSaveModified()) return;
 
+    CommandHistory::getInstance()->clear();
+
     SVDEBUG << "MainWindow::closeSession: telling session about it" << endl;
     m_session.unsetDocument();
 
@@ -4759,8 +4761,9 @@ MainWindow::closeSession()
         Pane *pane = m_paneStack->getPane(m_paneStack->getPaneCount() - 1);
 
         while (pane->getLayerCount() > 0) {
-            m_document->removeLayerFromView
-                (pane, pane->getLayer(pane->getLayerCount() - 1));
+            Layer *layer = pane->getLayer(pane->getLayerCount() - 1);
+            m_document->removeLayerFromView(pane, layer);
+            // will be deleted with the document below
         }
 
         m_overview->unregisterView(pane);
@@ -4773,8 +4776,9 @@ MainWindow::closeSession()
             (m_paneStack->getHiddenPaneCount() - 1);
 
         while (pane->getLayerCount() > 0) {
-            m_document->removeLayerFromView
-                (pane, pane->getLayer(pane->getLayerCount() - 1));
+            Layer *layer = pane->getLayer(pane->getLayerCount() - 1);
+            m_document->removeLayerFromView(pane, layer);
+            // will be deleted with the document below
         }
 
         m_overview->unregisterView(pane);
@@ -4998,15 +5002,32 @@ MainWindow::paneAdded(Pane *pane)
 void
 MainWindow::paneHidden(Pane *pane)
 {
-    if (m_overview) m_overview->unregisterView(pane); 
+    SVDEBUG << "MainWindow::paneHidden(" << pane << ")" << endl;
+    if (m_overview) m_overview->unregisterView(pane);
 }    
 
 void
-MainWindow::paneAboutToBeDeleted(Pane *pane)
+MainWindow::paneAboutToBeDeleted(Pane *)
 {
-    SVDEBUG << "MainWindow::paneAboutToBeDeleted(" << pane << ")" << endl;
-    if (m_overview) m_overview->unregisterView(pane); 
-}    
+    // If we delete panes using a command (as we generally do) then
+    // this doesn't happen until the command is deleted, which is not
+    // likely to be a useful moment.
+
+    // In theory we can use paneHidden, but the problem with *that* is
+    // that MainWindowBase::paneDeleteButtonClicked is called first
+    // and removes the layers from the pane. So for anything that must
+    // be called before the pane actually goes, we need to override
+    // and use paneDeleteButtonClicked.
+}
+
+void
+MainWindow::paneDeleteButtonClicked(Pane *pane)
+{
+    SVDEBUG << "MainWindow::paneDeleteButtonClicked(" << pane << ")" << endl;
+    m_session.paneRemoved(pane);
+
+    MainWindowBase::paneDeleteButtonClicked(pane);
+}
 
 void
 MainWindow::paneCancelButtonPressed(Layer *layer)
@@ -6284,6 +6305,10 @@ MainWindow::mainModelChanged(ModelId modelId)
                 this, SLOT(mainModelGainChanged(float)));
         connect(m_mainLevelPan, SIGNAL(panChanged(float)),
                 this, SLOT(mainModelPanChanged(float)));
+    }
+
+    if (m_viewManager->getAlignMode() && !modelId.isNone()) {
+        m_document->realignModels();
     }
 
     zoomToFit();
