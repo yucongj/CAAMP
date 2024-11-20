@@ -4751,6 +4751,8 @@ MainWindow::closeSession()
     
     if (!checkSaveModified()) return;
 
+    CommandHistory::getInstance()->clear();
+
     SVDEBUG << "MainWindow::closeSession: telling session about it" << endl;
     m_session.unsetDocument();
 
@@ -4759,8 +4761,9 @@ MainWindow::closeSession()
         Pane *pane = m_paneStack->getPane(m_paneStack->getPaneCount() - 1);
 
         while (pane->getLayerCount() > 0) {
-            m_document->removeLayerFromView
-                (pane, pane->getLayer(pane->getLayerCount() - 1));
+            Layer *layer = pane->getLayer(pane->getLayerCount() - 1);
+            m_document->removeLayerFromView(pane, layer);
+            // will be deleted with the document below
         }
 
         m_overview->unregisterView(pane);
@@ -4773,8 +4776,9 @@ MainWindow::closeSession()
             (m_paneStack->getHiddenPaneCount() - 1);
 
         while (pane->getLayerCount() > 0) {
-            m_document->removeLayerFromView
-                (pane, pane->getLayer(pane->getLayerCount() - 1));
+            Layer *layer = pane->getLayer(pane->getLayerCount() - 1);
+            m_document->removeLayerFromView(pane, layer);
+            // will be deleted with the document below
         }
 
         m_overview->unregisterView(pane);

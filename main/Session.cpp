@@ -212,6 +212,17 @@ Session::paneRemoved(Pane *pane)
 
     m_audioPanes = remainingPanes;
 
+    vector<Layer *> layersToRemove;
+    for (int i = 0; i < m_featurePane->getLayerCount(); ++i) {
+        Layer *layer = m_featurePane->getLayer(i);
+        if (layer->getModel() == modelToBeDeleted) {
+            layersToRemove.push_back(layer);
+        }
+    }
+    for (auto layer : layersToRemove) {
+        m_document->removeLayerFromView(m_featurePane, layer);
+    }
+    
     if (newMainModel == modelToBeDeleted) {
         newMainModel = {};
         SVDEBUG << "Session::paneRemoved: it's the main model pane being deleted, but we have no other model to be the main one" << endl;
@@ -584,7 +595,8 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     }
     if (m_featurePane) {
         if (m_featureData.find(activeModelId) != m_featureData.end()) {
-            m_featurePane->removeLayer(m_featureData.at(activeModelId).tempoLayer);
+            m_document->removeLayerFromView
+                (m_featurePane, m_featureData.at(activeModelId).tempoLayer);
         }
     }
     
@@ -1270,7 +1282,7 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
     TimeValueLayer *tempoLayer = nullptr;
     
     if (m_featureData.find(audioModel) == m_featureData.end()) {
-        m_featureData[audioModel] = { {}, nullptr };
+        m_featureData[audioModel] = { {}, nullptr, {}, false };
     }
 
     m_featureData.at(audioModel).alignmentModified = true;
