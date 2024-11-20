@@ -595,8 +595,10 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     }
     if (m_featurePane) {
         if (m_featureData.find(activeModelId) != m_featureData.end()) {
-            m_document->removeLayerFromView
-                (m_featurePane, m_featureData.at(activeModelId).tempoLayer);
+            auto tempoLayer = m_featureData.at(activeModelId).tempoLayer;
+            if (tempoLayer) {
+                m_document->removeLayerFromView(m_featurePane, tempoLayer);
+            }
         }
     }
     
@@ -805,7 +807,9 @@ Session::propagatePartialAlignmentFromMain(sv_frame_t audioFrameStartInMain,
         SVDEBUG << "selecting events from " << audioFrameStartInMain
                 << " to " << audioFrameEndInMain << endl;
         events = mainOnsetsModel->getEventsWithin
-            (audioFrameStartInMain, audioFrameEndInMain - audioFrameStartInMain);
+            (audioFrameStartInMain,
+             // +1 because end point is exclusive and we don't want it to be
+             audioFrameEndInMain - audioFrameStartInMain + 1);
     } else {
         events = mainOnsetsModel->getAllEvents();
     }
@@ -820,6 +824,15 @@ Session::propagatePartialAlignmentFromMain(sv_frame_t audioFrameStartInMain,
     m_partialAlignmentAudioStart = -1;
     m_partialAlignmentAudioEnd = -1;
 
+    if (audioFrameStartInMain >= 0) {
+        m_partialAlignmentAudioStart =
+            activeModel->alignFromReference(audioFrameStartInMain);
+    }
+    if (audioFrameEndInMain >= 0) {
+        m_partialAlignmentAudioEnd =
+            activeModel->alignFromReference(audioFrameEndInMain);
+    }
+    
     m_pendingOnsetsPane = pane;
     m_audioModelForPendingOnsets = activeModelId;
     
