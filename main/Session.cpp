@@ -232,6 +232,7 @@ Session::paneRemoved(Pane *pane)
     m_mainModel = newMainModel;
     if (m_document) {
         m_document->switchMainModel(m_mainModel);
+        m_document->realignModels();
     }
     
     if (m_activePane == pane) {
