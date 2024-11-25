@@ -120,6 +120,7 @@ signals:
                                        
 protected slots:
     void modelChanged(sv::ModelId);
+    void modelChangedWithin(sv::ModelId, sv::sv_frame_t, sv::sv_frame_t);
     void modelReady(sv::ModelId);
     
 private:
@@ -175,8 +176,6 @@ private:
     void recalculateTempoLayerFor(sv::ModelId audioModel);
     void updateOnsetColours();
 
-    void resetAllAlignmentEntries();
-    void resetAlignmentEntriesFor(sv::ModelId audioModel);
     bool updateAlignmentEntriesFor(sv::ModelId audioModel);
     bool exportAlignmentEntries(sv::ModelId fromAudioModel, QString toFilePath);
 };
