@@ -107,7 +107,24 @@
             "vcs": "git",
             "service": "github",
             "owner": "yucongj"
-	}
+	},
+        "match": {
+            "vcs": "git",
+	    "service": "github",
+            "owner": "c4dm",
+            "repository": "match-vamp",
+            "branch": "subsequence"
+        },
+        "constant-q-cpp": {
+            "vcs": "git",
+	    "service": "github",
+            "owner": "cannam"
+        },
+        "tuning-difference": {
+            "vcs": "git",
+	    "service": "github",
+            "owner": "cannam"
+        }
     }
 }
 

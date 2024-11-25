@@ -56,6 +56,15 @@
     },
     "dummy-score-aligner": {
       "pin": "489aba2ef9411dea17eb407aa7332ddc8152f960"
+    },
+    "tuning-difference": {
+      "pin": "5216a8858e8931c0d707192366488303bfb5a169"
+    },
+    "match": {
+      "pin": "9e0c3be2be4f97e5d91e888a48f6e0ad77edd2f4"
+    },
+    "constant-q-cpp": {
+      "pin": "7ac84048e3e43c433d88e12d221af15e50f41591"
     }
   }
 }

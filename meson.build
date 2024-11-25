@@ -2,7 +2,7 @@
 project(
   'Performance Precision',
   'c', 'cpp',
-  version: '1.1.0',
+  version: '1.2.0',
   license: 'GPL-2.0-or-later',
   default_options: [
     'cpp_std=c++17',
@@ -1466,6 +1466,39 @@ dummy_files = [
   'dummy-score-aligner/plugins.cpp',
 ]
 
+match_files = [
+  'match/src/DistanceMetric.cpp',
+  'match/src/FeatureConditioner.cpp',
+  'match/src/FeatureExtractor.cpp',
+  'match/src/Finder.cpp',
+  'match/src/FullDTW.cpp',
+  'match/src/Matcher.cpp',
+  'match/src/MatchFeatureFeeder.cpp',
+  'match/src/MatchPipeline.cpp',
+  'match/src/MatchVampPlugin.cpp',
+  'match/src/Path.cpp',
+  'match/src/SubsequenceMatchVampPlugin.cpp',
+  'match/src/libmain.cpp',
+]
+
+tuning_files = [
+  'constant-q-cpp/src/CQKernel.cpp',
+  'constant-q-cpp/src/ConstantQ.cpp',
+  'constant-q-cpp/src/CQSpectrogram.cpp',
+  'constant-q-cpp/src/CQInverse.cpp',
+  'constant-q-cpp/src/Chromagram.cpp',
+  'constant-q-cpp/src/Pitch.cpp',
+  'constant-q-cpp/src/dsp/FFT.cpp',
+  'constant-q-cpp/src/dsp/KaiserWindow.cpp',
+  'constant-q-cpp/src/dsp/MathUtilities.cpp',
+  'constant-q-cpp/src/dsp/Resampler.cpp',
+  'constant-q-cpp/src/dsp/SincWindow.cpp',
+  'constant-q-cpp/src/ext/kissfft/kiss_fft.c',
+  'constant-q-cpp/src/ext/kissfft/tools/kiss_fftr.c',
+  'tuning-difference/src/TuningDifference.cpp',
+  'tuning-difference/src/plugins.cpp',
+]
+
 ppa_plugin = shared_library(
   'score-aligner',
   ppa_files,
@@ -1496,6 +1529,54 @@ dummy_plugin = shared_library(
   ],
   cpp_args: [
     general_defines,
+  ],
+  dependencies: [
+    vampsdk_dep,
+  ],
+  link_args: [
+    general_link_args,
+    vamp_symbol_args,
+  ],
+  name_prefix: '',
+  install: true,
+)  
+
+match_plugin = shared_library(
+  'match-vamp-plugin',
+  match_files,
+  vampsdk_files,
+  include_directories: [
+    'vamp-plugin-sdk',
+  ],
+  cpp_args: [
+    general_defines,
+    '-DUSE_COMPACT_TYPES=1',
+  ],
+  dependencies: [
+    vampsdk_dep,
+  ],
+  link_args: [
+    general_link_args,
+    vamp_symbol_args,
+  ],
+  name_prefix: '',
+  install: true,
+)  
+
+tuning_plugin = shared_library(
+  'tuning-difference',
+  tuning_files,
+  vampsdk_files,
+  include_directories: [
+    'vamp-plugin-sdk',
+    'constant-q-cpp',
+    'constant-q-cpp/cq',
+    'constant-q-cpp/src/ext/kissfft',
+    'constant-q-cpp/src/ext/kissfft/tools',
+  ],
+  cpp_args: [
+    general_defines,
+    '-Dkiss_fft_scalar=double',
   ],
   dependencies: [
     vampsdk_dep,
