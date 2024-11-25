@@ -107,6 +107,14 @@ echo "Copying in dummy aligner plugin."
 cp $builddir/dummy-aligner.dylib "$source"/Contents/Resources/
 
 echo
+echo "Copying in tuning difference plugin."
+cp $builddir/tuning-difference.dylib "$source"/Contents/Resources/
+
+echo
+echo "Copying in MATCH plugin."
+cp $builddir/match-vamp-plugin.dylib "$source"/Contents/Resources/
+
+echo
 echo "Copying in lproj directories containing InfoPlist.strings translation files."
 cp -r i18n/*.lproj "$source"/Contents/Resources/
 
