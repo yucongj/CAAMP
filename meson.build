@@ -347,7 +347,7 @@ elif system == 'windows'
   capnp_cpp_plugin = svdeps_dir / 'bin/capnpc-c++'
 
   windows = import('windows')
-  rc = windows.compile_resources('icons/performance-precision.rc')
+  rc = windows.compile_resources('icons/piano-precision.rc')
 
   general_defines += [
     '-DWIN32',
