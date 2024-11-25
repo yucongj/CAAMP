@@ -1238,7 +1238,6 @@ Session::importAlignmentFrom(QString path)
 
     connect(existingModel.get(),
             &Model::modelChangedWithin, this, &Session::modelChangedWithin);
-
         
     return true;
 }
@@ -1336,12 +1335,22 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
             (m_document->createLayer(LayerFactory::TimeValues));
         ColourDatabase *cdb = ColourDatabase::getInstance();
         tempoLayer->setBaseColour(cdb->getColourIndex(tr("Blue")));
-        if (m_featurePane) {
-            m_document->addLayerToView(m_featurePane, tempoLayer);
-        }
         m_featureData[audioModel].tempoLayer = tempoLayer;
     } else {
         tempoLayer = m_featureData.at(audioModel).tempoLayer;
+    }
+
+    if (m_featurePane) {
+        bool inFeaturePane = false;
+        for (int i = 0; i < m_featurePane->getLayerCount(); ++i) {
+            if (m_featurePane->getLayer(i) == tempoLayer) {
+                inFeaturePane = true;
+                break;
+            }
+        }
+        if (!inFeaturePane) {
+            m_document->addLayerToView(m_featurePane, tempoLayer);
+        }
     }
         
     sv_samplerate_t sampleRate = ModelById::get(audioModel)->getSampleRate();
@@ -1373,7 +1382,7 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
         
     const auto &alignmentEntries = m_featureData.at(audioModel).alignmentEntries;
     int n = alignmentEntries.size();
-    
+
     int start = -1, end = -2;
     bool stop = false;
     while (!stop && end <= n - 4) {

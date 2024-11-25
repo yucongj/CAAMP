@@ -305,7 +305,6 @@ private:
     Session *m_session;
 
     static bool labelLessThan(QString first, QString second) {
-        std::cout << "labelLessThan(" << first << "," << second << ")" << std::endl;
         if (first == second) {
             return false;
         }
@@ -323,7 +322,6 @@ private:
                 return false;
             }
         }
-        std::cout << "yes" << std::endl;
         return true;
     }
 };
