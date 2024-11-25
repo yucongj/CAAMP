@@ -40,7 +40,7 @@ Session::Session() :
     m_pendingOnsetsLayer(nullptr)
 {
     SVDEBUG << "Session::Session" << endl;
-    setDocument(nullptr, nullptr, nullptr, nullptr);
+    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 Session::~Session()
@@ -51,6 +51,7 @@ void
 Session::setDocument(Document *doc,
                      Pane *mainAudioPane,
                      Pane *featurePane,
+                     View *overview,
                      Layer *timeRuler)
 {
     SVDEBUG << "Session::setDocument(" << doc << ")" << endl;
@@ -72,6 +73,7 @@ Session::setDocument(Document *doc,
     }
     m_featurePane = featurePane;
     m_activePane = mainAudioPane;
+    m_overview = overview;
     m_timeRulerLayer = timeRuler;
 
     m_partialAlignmentAudioStart = -1;
@@ -88,7 +90,7 @@ Session::setDocument(Document *doc,
 void
 Session::unsetDocument()
 {
-    setDocument(nullptr, nullptr, nullptr, nullptr);
+    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 TimeInstantLayer *
@@ -153,6 +155,27 @@ Session::setMainModel(ModelId modelId)
         return;
     }
 
+    ColourDatabase *cdb = ColourDatabase::getInstance();
+    auto waveColour = cdb->getColourIndex(tr("Orange"));
+
+    if (m_overview) {
+        WaveformLayer *overviewLayer = qobject_cast<WaveformLayer *>
+            (m_document->createLayer(LayerFactory::Waveform));
+        overviewLayer->setChannelMode(WaveformLayer::MergeChannels);
+        overviewLayer->setAggressiveCacheing(true);
+        overviewLayer->setBaseColour(waveColour);
+        m_document->addLayerToView(m_overview, overviewLayer);
+        m_document->setModel(overviewLayer, m_mainModel);
+    
+        m_featureData[m_mainModel] = {
+            {},                 // alignmentEntries
+            nullptr,            // tempoLayer
+            overviewLayer,      // overviewLayer
+            {},                 // lastExportedTo
+            false               // alignmentModified
+        };
+    }
+
     if (m_featurePane) {
         m_document->addLayerToView(m_featurePane, m_timeRulerLayer);
     
@@ -160,10 +183,10 @@ Session::setMainModel(ModelId modelId)
 
         WaveformLayer *waveformLayer = qobject_cast<WaveformLayer *>
             (m_document->createLayer(LayerFactory::Waveform));
-        waveformLayer->setBaseColour(cdb->getColourIndex(tr("Orange")));
+        waveformLayer->setBaseColour(waveColour);
     
         m_document->addLayerToView(m_featurePane, waveformLayer);
-        m_document->setModel(waveformLayer, modelId);
+        m_document->setModel(waveformLayer, m_mainModel);
     }
     
     SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
@@ -172,9 +195,9 @@ Session::setMainModel(ModelId modelId)
     spectrogramLayer->setColourMap(ColourMapper::Green);
     spectrogramLayer->setColourScale(ColourScaleType::Log);
     spectrogramLayer->setColourScaleMultiple(2.0);
-
+    
     m_document->addLayerToView(m_audioPanes[0], spectrogramLayer);
-    m_document->setModel(spectrogramLayer, modelId);
+    m_document->setModel(spectrogramLayer, m_mainModel);
 
     resetAlignmentEntriesFor(modelId);
 }
@@ -212,15 +235,20 @@ Session::paneRemoved(Pane *pane)
 
     m_audioPanes = remainingPanes;
 
-    vector<Layer *> layersToRemove;
-    for (int i = 0; i < m_featurePane->getLayerCount(); ++i) {
-        Layer *layer = m_featurePane->getLayer(i);
-        if (layer->getModel() == modelToBeDeleted) {
-            layersToRemove.push_back(layer);
+    vector<View *> views = { m_featurePane, m_overview };
+
+    for (auto view : views) {
+        if (!view) continue;
+        vector<Layer *> layersToRemove;
+        for (int i = 0; i < view->getLayerCount(); ++i) {
+            Layer *layer = view->getLayer(i);
+            if (layer->getModel() == modelToBeDeleted) {
+                layersToRemove.push_back(layer);
+            }
         }
-    }
-    for (auto layer : layersToRemove) {
-        m_document->removeLayerFromView(m_featurePane, layer);
+        for (auto layer : layersToRemove) {
+            m_document->removeLayerFromView(view, layer);
+        }
     }
     
     if (newMainModel == modelToBeDeleted) {
@@ -342,8 +370,7 @@ Session::addFurtherAudioPane(Pane *audioPane)
     }
 
     // This pane should already have a waveform, so we move that to
-    // the feature pane. If we don't find one, we have to make a new
-    // one.
+    // the feature pane.
 
     WaveformLayer *waveformLayer = nullptr;
     
@@ -357,6 +384,24 @@ Session::addFurtherAudioPane(Pane *audioPane)
     if (waveformLayer) {
         m_document->removeLayerFromView(audioPane, waveformLayer);
         m_document->addLayerToView(m_featurePane, waveformLayer);
+
+        if (m_overview) {
+            WaveformLayer *overviewLayer = qobject_cast<WaveformLayer *>
+                (m_document->createLayer(LayerFactory::Waveform));
+            overviewLayer->setChannelMode(WaveformLayer::MergeChannels);
+            overviewLayer->setAggressiveCacheing(true);
+            overviewLayer->setBaseColour(waveformLayer->getBaseColour());
+            m_document->addLayerToView(m_overview, overviewLayer);
+            m_document->setModel(overviewLayer, modelId);
+    
+            m_featureData[modelId] = {
+                {},                 // alignmentEntries
+                nullptr,            // tempoLayer
+                overviewLayer,      // overviewLayer
+                {},                 // lastExportedTo
+                false               // alignmentModified
+            };
+        }
     }
     
     SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
@@ -398,28 +443,26 @@ Session::setActivePane(Pane *pane)
         return;
     }
     
-    // Select the associated waveform and tempo curve in the feature
-    // pane, hide the rest
+    // Select the associated waveform and tempo curves in the feature
+    // pane and overview, hide the rest
 
-    if (!m_featurePane) {
-        return;
-    }
+    vector<View *> views = { m_featurePane, m_overview };
     
-    int n = m_featurePane->getLayerCount();
-    for (int i = 0; i < n; ++i) {
-
-        auto layer = m_featurePane->getLayer(i);
-
-        auto waveform = qobject_cast<WaveformLayer *>(layer);
-        if (waveform) {
-            waveform->showLayer
-                (m_featurePane, waveform->getModel() == audioModel);
-        }
-
-        auto tempo = qobject_cast<TimeValueLayer *>(layer);
-        if (tempo) {
-            tempo->showLayer
-                (m_featurePane, tempo->getSourceModel() == audioModel);
+    for (auto view : views) {
+        if (!view) continue;
+        int n = view->getLayerCount();
+        for (int i = 0; i < n; ++i) {
+            auto layer = view->getLayer(i);
+            auto waveform = qobject_cast<WaveformLayer *>(layer);
+            if (waveform) {
+                waveform->showLayer
+                    (view, waveform->getModel() == audioModel);
+            }
+            auto tempo = qobject_cast<TimeValueLayer *>(layer);
+            if (tempo) {
+                tempo->showLayer
+                    (view, tempo->getSourceModel() == audioModel);
+            }
         }
     }
 }
@@ -1214,6 +1257,7 @@ Session::resetAlignmentEntriesFor(ModelId model)
         m_featureData[model] = {
             {},                 // alignmentEntries
             nullptr,            // tempoLayer
+            nullptr,            // overviewLayer
             {},                 // lastExportedTo
             false               // alignmentModified
         };
@@ -1296,7 +1340,13 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
     TimeValueLayer *tempoLayer = nullptr;
     
     if (m_featureData.find(audioModel) == m_featureData.end()) {
-        m_featureData[audioModel] = { {}, nullptr, {}, false };
+        m_featureData[audioModel] = {
+            {},                 // alignmentEntries
+            nullptr,            // tempoLayer
+            nullptr,            // overviewLayer
+            {},                 // lastExportedTo
+            false               // alignmentModified
+        };
     }
 
     m_featureData.at(audioModel).alignmentModified = true;

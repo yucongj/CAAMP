@@ -543,11 +543,6 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     connect(m_overview, SIGNAL(contextHelpChanged(const QString &)),
             this, SLOT(contextHelpChanged(const QString &)));
 
-    m_panLayer = new WaveformLayer;
-    m_panLayer->setChannelMode(WaveformLayer::MergeChannels);
-    m_panLayer->setAggressiveCacheing(true);
-    m_overview->addLayer(m_panLayer);
-
     coloursChanged(); // sets pan layer colour from preferences
 
     m_playSpeed = new AudioDial(frame);
@@ -4736,7 +4731,8 @@ MainWindow::documentReplaced()
 
     SVDEBUG << "MainWindow::documentReplaced: Added views, now calling m_session.setDocument" << endl;
     
-    m_session.setDocument(m_document, topPane, bottomPane, m_timeRulerLayer);
+    m_session.setDocument(m_document, topPane, bottomPane,
+                          m_overview, m_timeRulerLayer);
 
     CommandHistory::getInstance()->clear();
     CommandHistory::getInstance()->documentSaved();
@@ -5351,19 +5347,9 @@ MainWindow::coloursChanged()
          ColourDatabase::WithDarkBackground :
          ColourDatabase::WithLightBackground);
     QString defaultColourName = cdb->getColourName(nearestIndex);
-    
-    QColor colour = QColor
-        (settings.value("overview-colour",
-                        cdb->getColour(defaultColourName).name()).toString());
     settings.endGroup();
 
-    int index = cdb->getColourIndex(colour);
-
-    SVDEBUG << "MainWindow::coloursChanged: haveDarkBackground = " << haveDarkBackground << ", highlight = " << highlight.name() << ", nearestIndex = " << nearestIndex << ", defaultColourName = " << defaultColourName << ", colour = " << colour.name() << ", index = " << index << endl;
-
-    if (index >= 0) {
-        m_panLayer->setBaseColour(index);
-    }
+    SVDEBUG << "MainWindow::coloursChanged: haveDarkBackground = " << haveDarkBackground << ", highlight = " << highlight.name() << ", nearestIndex = " << nearestIndex << ", defaultColourName = " << defaultColourName << endl;
 }
 
 void
@@ -5989,8 +5975,6 @@ MainWindow::currentPaneChanged(Pane *pane)
         }
     }
 
-    bool panLayerSet = false;
-    
     for (int i = pane->getLayerCount(); i > 0; ) {
         --i;
         Layer *layer = pane->getLayer(i);
@@ -6000,16 +5984,7 @@ MainWindow::currentPaneChanged(Pane *pane)
             if (type != LayerFactory::TimeRuler) {
                 updateLayerShortcutsFor(modelId);
             }
-            if (type == LayerFactory::Waveform && m_panLayer) {
-                m_panLayer->setModel(modelId);
-                panLayerSet = true;
-                break;
-            }
         }
-    }
-
-    if (containsMainModel && !panLayerSet && m_panLayer) {
-        m_panLayer->setModel(getMainModelId());
     }
 
     m_session.setActivePane(pane);
@@ -6296,8 +6271,6 @@ MainWindow::mainModelChanged(ModelId modelId)
 {
     SVDEBUG << "MainWindow::mainModelChanged" << endl;
     
-    m_panLayer->setModel(modelId);
-
     MainWindowBase::mainModelChanged(modelId);
 
     if (m_playTarget || m_audioIO) {
