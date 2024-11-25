@@ -272,8 +272,10 @@ public:
         }
         auto events = targetModel->getAllEvents();
         int eventCount = targetModel->getEventCount();
+        bool found = false;
         for (int i = 0; i < eventCount; ++i) {
             if (label == events[i].getLabel()) {
+                found = true;
                 sv_frame_t eventFrame = events[i].getFrame();
                 if (proportion == 0.0 || i + 1 == eventCount) {
                     frame = eventFrame;
@@ -286,10 +288,44 @@ public:
                 }
             }
         }
+        if (!found) {
+            for (int i = 0; i < eventCount; ++i) {
+                frame = events[i].getFrame();
+                if (labelLessThan(label, events[i].getLabel())) {
+                    if (i > 0) {
+                        frame = events[i-1].getFrame();
+                    }
+                    return;
+                }
+            }
+        }
     }
     
 private:
     Session *m_session;
+
+    static bool labelLessThan(QString first, QString second) {
+        std::cout << "labelLessThan(" << first << "," << second << ")" << std::endl;
+        if (first == second) {
+            return false;
+        }
+        static QRegularExpression punct("[^0-9]");
+        QStringList firstBits = first.split(punct, Qt::SkipEmptyParts);
+        QStringList secondBits = second.split(punct, Qt::SkipEmptyParts);
+        if (firstBits.size() < 2 || secondBits.size() < 2) {
+            return false;
+        }
+        int i0 = firstBits[0].toInt(), i1 = secondBits[0].toInt();
+        if (i0 > i1) {
+            return false;
+        } else if (i0 == i1) {
+            if (firstBits[1].toInt() >= secondBits[1].toInt()) {
+                return false;
+            }
+        }
+        std::cout << "yes" << std::endl;
+        return true;
+    }
 };
 
 MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSupport) :
@@ -2927,18 +2963,10 @@ MainWindow::actOnScoreLocation(Fraction location,
         SVDEBUG << "MainWindow::actOnScorePosition: missing target model" << endl;
         return;
     }
-    
-    const auto events = targetModel->getAllEvents();
-    if (events.empty()) return;
 
     sv_frame_t frame = 0;
-    QString qlabel = QString::fromStdString(label);
-    for (const auto &e : events) {
-        frame = e.getFrame();
-        if (qlabel == e.getLabel()) {
-            break;
-        }
-    }
+    m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+        (targetId, QString::fromStdString(label), 0.0, frame);
 
     SVDEBUG << "MainWindow::actOnScorePosition: mapped location " << location
             << ", label " << label << " to frame " << frame << endl;
