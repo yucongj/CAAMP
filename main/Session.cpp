@@ -1384,6 +1384,7 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
 
     int start = -1, end = -2;
     bool stop = false;
+    sv_frame_t prev = -1;
     while (!stop && end <= n - 4) {
         start = end + 2;
         while (alignmentEntries[start].frame < 0) {
@@ -1408,9 +1409,17 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
             auto nextSec = RealTime::frame2RealTime(nextFrame, sampleRate).toDouble();
             Fraction dur = m_musicalEvents[i].duration;
             if (abs(nextSec - thisSec) > 0) {
+                if (prev > 0) {
+                    tempoModel->add({ prev + 1, 0.0, QString() });
+                    tempoModel->add({ thisFrame - 1, 0.0, QString() });
+                    prev = -1;
+                }
                 double tempo = (4. * dur.numerator / dur.denominator) * 60. / (nextSec - thisSec); // num of quarter notes per minutes
                 Event tempoEvent(thisFrame, float(tempo), QString());
                 tempoModel->add(tempoEvent);
+            }
+            if (i + 1 == end) {
+                prev = thisFrame;
             }
         }
     }
