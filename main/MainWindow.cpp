@@ -5018,6 +5018,7 @@ MainWindow::paneAdded(Pane *pane)
                 this, &MainWindow::paneCancelButtonPressed);
         pane->setPlaybackFrameAligner(m_scoreBasedFrameAligner);
         pane->setPlaybackFollow(PlaybackScrollPageWithCentre);
+        pane->setSelectionSnapToFeatures(false);
     }
 }    
 
