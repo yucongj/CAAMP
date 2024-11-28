@@ -56,7 +56,7 @@ NetworkPermissionTester::havePermission()
         preamble = QCoreApplication::translate
             ("NetworkPermissionTester",
              "<h2>Welcome to %1!</h2>"
-             "<p>%1 is a program that assists analysis of recorded piano performances alongside their scores.</p>"
+             "<p>%1 is a program that assists analysis of recorded music performances alongside their scores.</p>"
              "<p>%1 is open source software under the GNU General Public License.</p>"
              "<p><hr></p>"
              "<p><b>Before we go on...</b></p>"
