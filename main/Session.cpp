@@ -1268,32 +1268,31 @@ Session::updateAlignmentEntriesFor(ModelId audioModelId)
                 << audioModelId << endl;
         return false;
     }
+
+    std::map<std::string, sv_frame_t> labelFrameMap;
     
     auto onsetsLayer = getOnsetsLayerFromPane
         (pane, OnsetsLayerSelection::ExcludePendingOnsets);
-    if (!onsetsLayer) {
+
+    if (onsetsLayer) {
+        shared_ptr<SparseOneDimensionalModel> onsetsModel =
+            ModelById::getAs<SparseOneDimensionalModel>(onsetsLayer->getModel());
+        if (onsetsModel) {
+            auto onsets = onsetsModel->getAllEvents();
+            for (auto onset : onsets) {
+                labelFrameMap[onset.getLabel().toStdString()] = onset.getFrame();
+            }
+        } else {
+            SVDEBUG << "Session::updateAlignmentEntriesFor: WARNING: Onsets layer for model " << audioModelId << " lacks onsets model itself" << endl;
+        }
+    } else {
         SVDEBUG << "Session::updateAlignmentEntriesFor: NOTE: No onsets layer for model " << audioModelId << endl;
         // This is actually fine, it just means the alignment is
-        // effectively empty
-        return true;
-    }
-
-    shared_ptr<SparseOneDimensionalModel> onsetsModel =
-        ModelById::getAs<SparseOneDimensionalModel>(onsetsLayer->getModel());
-    if (!onsetsModel) {
-        SVDEBUG << "Session::updateAlignmentEntriesFor: Onsets layer for model "
-                << audioModelId << " lacks onsets model itself" << endl;
-        return false;
+        // effectively empty (full of -1s)
     }
 
     auto &alignmentEntries = m_featureData.at(audioModelId).alignmentEntries;
     alignmentEntries.clear();
-
-    std::map<std::string, sv_frame_t> labelFrameMap;
-    auto onsets = onsetsModel->getAllEvents();
-    for (auto onset : onsets) {
-        labelFrameMap[onset.getLabel().toStdString()] = onset.getFrame();
-    }
     
     for (auto &event : m_musicalEvents) {
         Score::MeasureInfo info = event.measureInfo;
