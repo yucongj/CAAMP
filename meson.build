@@ -347,7 +347,7 @@ elif system == 'windows'
   capnp_cpp_plugin = svdeps_dir / 'bin/capnpc-c++'
 
   windows = import('windows')
-  rc = windows.compile_resources('icons/piano-precision.rc')
+  rc = windows.compile_resources('icons/performance-precision.rc')
 
   general_defines += [
     '-DWIN32',
@@ -1640,7 +1640,7 @@ install_data(
 )
 
 install_data(
-  'icons/piano-precision-icon.svg',
+  'icons/performance-precision-icon.svg',
   install_dir : get_option('datadir') / 'icons/hicolor/scalable/apps',
 )
 

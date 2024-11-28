@@ -75,12 +75,12 @@
     <file>icons/scalable/zoom-out.svg</file>
     <file>icons/scalable/zoom-fit.svg</file>
     <file>icons/scalable/zoom-reset.svg</file>
-    <file>icons/piano-precision-icon.svg</file>
-    <file>icons/piano-precision-icon-16x16.png</file>
-    <file>icons/piano-precision-icon-32x32.png</file>
-    <file>icons/piano-precision-icon-64x64.png</file>
-    <file>icons/piano-precision-icon-128x128.png</file>
-    <file>icons/piano-precision-icon-256x256.png</file>
+    <file>icons/performance-precision-icon.svg</file>
+    <file>icons/performance-precision-icon-16x16.png</file>
+    <file>icons/performance-precision-icon-32x32.png</file>
+    <file>icons/performance-precision-icon-64x64.png</file>
+    <file>icons/performance-precision-icon-128x128.png</file>
+    <file>icons/performance-precision-icon-256x256.png</file>
     <file>icons/image.png</file>
     <file>icons/draw-curve.png</file>
     <file>icons/measure.png</file>
