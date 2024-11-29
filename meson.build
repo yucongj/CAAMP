@@ -1575,6 +1575,7 @@ tuning_plugin = shared_library(
     'constant-q-cpp/src/ext/kissfft/tools',
   ],
   c_args: [
+    general_defines,
     '-Dkiss_fft_scalar=double',
   ],
   cpp_args: [
