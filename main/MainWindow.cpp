@@ -5961,10 +5961,16 @@ MainWindow::restoreNormalPlayback()
 void
 MainWindow::currentPaneChanged(Pane *pane)
 {
-    if (!pane) {
-        MainWindowBase::currentPaneChanged(pane);
-        return;
-    }
+    // We don't call MainWindowBase::currentPaneChanged from this.
+    // One of the big things it does is to update the solo model set
+    // for playback in solo mode, but we want slightly different
+    // behaviour from the SV default. While SV solos all models shown
+    // in the selected pane, we want always to solo only the current
+    // audio model.
+
+    updateVisibleRangeDisplay(pane);
+    
+    if (!pane) return;
     
     QString scoreLabel;
     double proportion = 0;
@@ -5982,8 +5988,6 @@ MainWindow::currentPaneChanged(Pane *pane)
             m_playSource->stop();
         }
     }
-
-    MainWindowBase::currentPaneChanged(pane);
 
     // If this pane contains the main model, it usually makes sense to
     // show the main model in the pan layer even if it isn't the top
@@ -6015,6 +6019,16 @@ MainWindow::currentPaneChanged(Pane *pane)
     }
 
     m_session.setActivePane(pane);
+
+    auto activeModel = m_session.getActiveAudioModel();
+
+    if (m_viewManager->getPlaySoloMode()) {
+        m_viewManager->setPlaybackModel(activeModel);
+        m_playSource->setSoloModelSet({ activeModel });
+    } else {
+        m_viewManager->setPlaybackModel({});
+        m_playSource->setSoloModelSet({});
+    }
     
     if (wasPlaying) {
         if (scoreLabel != "") {

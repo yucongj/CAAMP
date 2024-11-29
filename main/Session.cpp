@@ -74,6 +74,7 @@ Session::setDocument(Document *doc,
     m_featurePane = featurePane;
     m_activePane = mainAudioPane;
     m_overview = overview;
+    m_activePane = mainAudioPane;
     m_timeRulerLayer = timeRuler;
 
     m_partialAlignmentAudioStart = -1;
@@ -275,8 +276,8 @@ Session::getAudioModelFromPane(Pane *pane) const
     
     int n = pane->getLayerCount();
 
-    SVDEBUG << "Session::getAudioModelFromPane: pane = " << pane
-            << ", n = " << n << endl;
+//    SVDEBUG << "Session::getAudioModelFromPane: pane = " << pane
+//            << ", n = " << n << endl;
     
     for (int i = n-1; i >= 0; --i) {
 
@@ -285,16 +286,16 @@ Session::getAudioModelFromPane(Pane *pane) const
         
         auto layer = pane->getLayer(i);
 
-        SVDEBUG << "layer " << i << ": " << layer->getLayerPresentationName()
-                << endl;
+//        SVDEBUG << "layer " << i << ": " << layer->getLayerPresentationName()
+//                << endl;
         
         auto waveformLayer = qobject_cast<WaveformLayer *>(layer);
-        if (waveformLayer) {
+        if (waveformLayer && !waveformLayer->isLayerDormant(pane)) {
             return waveformLayer->getModel();
         }
         
         auto spectrogramLayer = qobject_cast<SpectrogramLayer *>(layer);
-        if (spectrogramLayer) {
+        if (spectrogramLayer && !spectrogramLayer->isLayerDormant(pane)) {
             return spectrogramLayer->getModel();
         }
     }
@@ -479,36 +480,12 @@ Session::getActiveAudioTitle() const
 ModelId
 Session::getActiveAudioModel() const
 {
-//    SVDEBUG << "Session::getActiveAudioModel: we have " << m_audioPanes.size()
-//            << " audio panes" << endl;
+    // We used to laboriously check that the active pane was an audio
+    // pane and return the main model if it wasn't, but
+    // getActiveAudioModel is clever enough to return the right model
+    // also when the feature pane is active, so this should be fine
     
-    if (m_activePane) {
-
-        // Check against the audio panes, because it might not be one
-        for (auto p: m_audioPanes) {
-            if (m_activePane == p) {
-                auto modelId = getAudioModelFromPane(p);
-//                SVDEBUG << "Session::getActiveAudioModel: Returning model "
-//                        << modelId << " from active pane " << p << endl;
-                return modelId;
-            }
-        }
-
-//        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
-//                << m_mainModel << " as active pane is not an audio one" << endl;
-        return m_mainModel;
-    }
-
-    if (m_audioPanes.empty()) {
-//        SVDEBUG << "Session::getActiveAudioModel: Returning main model "
-//                << m_mainModel << " as we have no active pane" << endl;
-        return m_mainModel;
-    } else {
-        auto modelId = getAudioModelFromPane(m_audioPanes[0]);
-//        SVDEBUG << "Session::getActiveAudioModel: Returning model "
-//                << modelId << " from first pane " << m_audioPanes[0] << endl;
-        return modelId;
-    }
+    return getAudioModelFromPane(m_activePane);
 }
 
 Pane *
