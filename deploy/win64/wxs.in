@@ -91,8 +91,8 @@
 
             <File
                 Id="winicon.ico"
-                Name="piano-precision-winicon.ico"
-                Source="icons\piano-precision-winicon.ico"/>
+                Name="performance-precision-winicon.ico"
+                Source="icons\performance-precision-winicon.ico"/>
           </Component>
           
           <Component Win64="yes"
@@ -311,6 +311,22 @@
 		  Name="dummy-aligner.dll"
 		  Source="build_win64\dummy-aligner.dll"/>
 	    </Component>
+            <Component Win64="yes"
+                Id="Tuning64"
+                Guid="da8d5432-f5d4-4a74-bbac-3ca32bc516b7">
+	      <File
+		  Id="tuning64"
+		  Name="tuning-difference.dll"
+		  Source="build_win64\tuning-difference.dll"/>
+	    </Component>
+            <Component Win64="yes"
+                Id="Match64"
+                Guid="79fe7a6b-bd27-459c-ac63-9d1544b99783">
+	      <File
+		  Id="match64"
+		  Name="match-vamp-plugin.dll"
+		  Source="build_win64\match-vamp-plugin.dll"/>
+	    </Component>
           </Directory> <!-- plugins -->
 	</Directory> <!-- sv -->
       </Directory> <!-- pfiles64 -->
@@ -352,6 +368,8 @@
       <ComponentRef Id="Checker64"/>
       <ComponentRef Id="Aligner64"/>
       <ComponentRef Id="DummyAligner64"/>
+      <ComponentRef Id="Tuning64"/>
+      <ComponentRef Id="Match64"/>
       <ComponentRef Id="ProgramMenuDir"/>
       @COMPONENT_REFS@
     </Feature>
@@ -367,7 +385,7 @@
     <Property Id="WixAppFolder" Value="WixPerMachineFolder" />
     <WixVariable Id="WixUILicenseRtf" Value="deploy\win64\License.rtf" />
     
-    <Icon Id="winicon.ico" SourceFile="icons\piano-precision-winicon.ico"/>
+    <Icon Id="winicon.ico" SourceFile="icons\performance-precision-winicon.ico"/>
     <Property Id="ARPPRODUCTICON" Value="winicon.ico" />
 
     <WixVariable Id="WixUIBannerBmp" Value="deploy\win64\top.bmp"/>

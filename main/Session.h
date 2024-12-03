@@ -72,6 +72,7 @@ public slots:
     void setDocument(sv::Document *,
                      sv::Pane *topAudioPane,
                      sv::Pane *featurePane,
+                     sv::View *overview,
                      sv::Layer *timeRuler);
 
     void addFurtherAudioPane(sv::Pane *audioPane);
@@ -119,6 +120,7 @@ signals:
                                        
 protected slots:
     void modelChanged(sv::ModelId);
+    void modelChangedWithin(sv::ModelId, sv::sv_frame_t, sv::sv_frame_t);
     void modelReady(sv::ModelId);
     
 private:
@@ -131,6 +133,7 @@ private:
 
     std::vector<sv::Pane *> m_audioPanes;
     sv::Pane *m_featurePane;
+    sv::View *m_overview;
     sv::Pane *m_activePane; // an alias for one of the panes, or null
     sv::Layer *m_timeRulerLayer;
 
@@ -146,6 +149,7 @@ private:
     struct FeatureData {
         std::vector<AlignmentEntry> alignmentEntries;
         sv::TimeValueLayer *tempoLayer;
+        sv::WaveformLayer *overviewLayer;
         QString lastExportedTo;
         bool alignmentModified;
     };
@@ -172,8 +176,6 @@ private:
     void recalculateTempoLayerFor(sv::ModelId audioModel);
     void updateOnsetColours();
 
-    void resetAllAlignmentEntries();
-    void resetAlignmentEntriesFor(sv::ModelId audioModel);
     bool updateAlignmentEntriesFor(sv::ModelId audioModel);
     bool exportAlignmentEntries(sv::ModelId fromAudioModel, QString toFilePath);
 };

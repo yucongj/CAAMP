@@ -68,7 +68,7 @@ deploy/macos/copy-scores.sh "$full_name"
 echo
 echo "Copying in icon."
 
-cp "icons/piano-precision-macicon.icns" "$source/Contents/Resources"
+cp "icons/performance-precision-macicon.icns" "$source/Contents/Resources"
 
 echo
 echo "Copying in frameworks and plugins from Qt installation directory."
@@ -105,6 +105,14 @@ cp $builddir/score-aligner.dylib "$source"/Contents/Resources/
 echo
 echo "Copying in dummy aligner plugin."
 cp $builddir/dummy-aligner.dylib "$source"/Contents/Resources/
+
+echo
+echo "Copying in tuning difference plugin."
+cp $builddir/tuning-difference.dylib "$source"/Contents/Resources/
+
+echo
+echo "Copying in MATCH plugin."
+cp $builddir/match-vamp-plugin.dylib "$source"/Contents/Resources/
 
 echo
 echo "Copying in lproj directories containing InfoPlist.strings translation files."

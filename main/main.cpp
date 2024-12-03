@@ -482,7 +482,7 @@ main(int argc, char **argv)
     QIcon icon;
     int sizes[] = { 16, 32, 64, 128, 256 };
     for (int i = 0; i < int(sizeof(sizes)/sizeof(sizes[0])); ++i) {
-        icon.addFile(QString(":icons/piano-precision-icon-%1x%2.png")
+        icon.addFile(QString(":icons/performance-precision-icon-%1x%2.png")
                      .arg(sizes[i]).arg(sizes[i]));
     }
     QApplication::setWindowIcon(icon);

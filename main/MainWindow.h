@@ -228,7 +228,6 @@ protected:
     sv::Overview                *m_overview;
     sv::LevelPanToolButton      *m_mainLevelPan;
     sv::AudioDial               *m_playSpeed;
-    sv::WaveformLayer           *m_panLayer;
     
     QScrollArea             *m_mainScroll;
     ScoreWidget             *m_scoreWidget;

@@ -272,8 +272,10 @@ public:
         }
         auto events = targetModel->getAllEvents();
         int eventCount = targetModel->getEventCount();
+        bool found = false;
         for (int i = 0; i < eventCount; ++i) {
             if (label == events[i].getLabel()) {
+                found = true;
                 sv_frame_t eventFrame = events[i].getFrame();
                 if (proportion == 0.0 || i + 1 == eventCount) {
                     frame = eventFrame;
@@ -286,10 +288,42 @@ public:
                 }
             }
         }
+        if (!found) {
+            for (int i = 0; i < eventCount; ++i) {
+                frame = events[i].getFrame();
+                if (labelLessThan(label, events[i].getLabel())) {
+                    if (i > 0) {
+                        frame = events[i-1].getFrame();
+                    }
+                    return;
+                }
+            }
+        }
     }
     
 private:
     Session *m_session;
+
+    static bool labelLessThan(QString first, QString second) {
+        if (first == second) {
+            return false;
+        }
+        static QRegularExpression punct("[^0-9]");
+        QStringList firstBits = first.split(punct, Qt::SkipEmptyParts);
+        QStringList secondBits = second.split(punct, Qt::SkipEmptyParts);
+        if (firstBits.size() < 2 || secondBits.size() < 2) {
+            return false;
+        }
+        int i0 = firstBits[0].toInt(), i1 = secondBits[0].toInt();
+        if (i0 > i1) {
+            return false;
+        } else if (i0 == i1) {
+            if (firstBits[1].toInt() >= secondBits[1].toInt()) {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSupport) :
@@ -542,11 +576,6 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
 #endif
     connect(m_overview, SIGNAL(contextHelpChanged(const QString &)),
             this, SLOT(contextHelpChanged(const QString &)));
-
-    m_panLayer = new WaveformLayer;
-    m_panLayer->setChannelMode(WaveformLayer::MergeChannels);
-    m_panLayer->setAggressiveCacheing(true);
-    m_overview->addLayer(m_panLayer);
 
     coloursChanged(); // sets pan layer colour from preferences
 
@@ -2932,18 +2961,10 @@ MainWindow::actOnScoreLocation(Fraction location,
         SVDEBUG << "MainWindow::actOnScorePosition: missing target model" << endl;
         return;
     }
-    
-    const auto events = targetModel->getAllEvents();
-    if (events.empty()) return;
 
     sv_frame_t frame = 0;
-    QString qlabel = QString::fromStdString(label);
-    for (const auto &e : events) {
-        frame = e.getFrame();
-        if (qlabel == e.getLabel()) {
-            break;
-        }
-    }
+    m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+        (targetId, QString::fromStdString(label), 0.0, frame);
 
     SVDEBUG << "MainWindow::actOnScorePosition: mapped location " << location
             << ", label " << label << " to frame " << frame << endl;
@@ -4736,7 +4757,8 @@ MainWindow::documentReplaced()
 
     SVDEBUG << "MainWindow::documentReplaced: Added views, now calling m_session.setDocument" << endl;
     
-    m_session.setDocument(m_document, topPane, bottomPane, m_timeRulerLayer);
+    m_session.setDocument(m_document, topPane, bottomPane,
+                          m_overview, m_timeRulerLayer);
 
     CommandHistory::getInstance()->clear();
     CommandHistory::getInstance()->documentSaved();
@@ -4996,6 +5018,7 @@ MainWindow::paneAdded(Pane *pane)
                 this, &MainWindow::paneCancelButtonPressed);
         pane->setPlaybackFrameAligner(m_scoreBasedFrameAligner);
         pane->setPlaybackFollow(PlaybackScrollPageWithCentre);
+        pane->setSelectionSnapToFeatures(false);
     }
 }    
 
@@ -5351,19 +5374,9 @@ MainWindow::coloursChanged()
          ColourDatabase::WithDarkBackground :
          ColourDatabase::WithLightBackground);
     QString defaultColourName = cdb->getColourName(nearestIndex);
-    
-    QColor colour = QColor
-        (settings.value("overview-colour",
-                        cdb->getColour(defaultColourName).name()).toString());
     settings.endGroup();
 
-    int index = cdb->getColourIndex(colour);
-
-    SVDEBUG << "MainWindow::coloursChanged: haveDarkBackground = " << haveDarkBackground << ", highlight = " << highlight.name() << ", nearestIndex = " << nearestIndex << ", defaultColourName = " << defaultColourName << ", colour = " << colour.name() << ", index = " << index << endl;
-
-    if (index >= 0) {
-        m_panLayer->setBaseColour(index);
-    }
+    SVDEBUG << "MainWindow::coloursChanged: haveDarkBackground = " << haveDarkBackground << ", highlight = " << highlight.name() << ", nearestIndex = " << nearestIndex << ", defaultColourName = " << defaultColourName << endl;
 }
 
 void
@@ -5948,10 +5961,16 @@ MainWindow::restoreNormalPlayback()
 void
 MainWindow::currentPaneChanged(Pane *pane)
 {
-    if (!pane) {
-        MainWindowBase::currentPaneChanged(pane);
-        return;
-    }
+    // We don't call MainWindowBase::currentPaneChanged from this.
+    // One of the big things it does is to update the solo model set
+    // for playback in solo mode, but we want slightly different
+    // behaviour from the SV default. While SV solos all models shown
+    // in the selected pane, we want always to solo only the current
+    // audio model.
+
+    updateVisibleRangeDisplay(pane);
+    
+    if (!pane) return;
     
     QString scoreLabel;
     double proportion = 0;
@@ -5970,8 +5989,6 @@ MainWindow::currentPaneChanged(Pane *pane)
         }
     }
 
-    MainWindowBase::currentPaneChanged(pane);
-
     // If this pane contains the main model, it usually makes sense to
     // show the main model in the pan layer even if it isn't the top
     // layer in the pane (e.g. if the top layer is one derived from
@@ -5989,8 +6006,6 @@ MainWindow::currentPaneChanged(Pane *pane)
         }
     }
 
-    bool panLayerSet = false;
-    
     for (int i = pane->getLayerCount(); i > 0; ) {
         --i;
         Layer *layer = pane->getLayer(i);
@@ -6000,19 +6015,20 @@ MainWindow::currentPaneChanged(Pane *pane)
             if (type != LayerFactory::TimeRuler) {
                 updateLayerShortcutsFor(modelId);
             }
-            if (type == LayerFactory::Waveform && m_panLayer) {
-                m_panLayer->setModel(modelId);
-                panLayerSet = true;
-                break;
-            }
         }
     }
 
-    if (containsMainModel && !panLayerSet && m_panLayer) {
-        m_panLayer->setModel(getMainModelId());
-    }
-
     m_session.setActivePane(pane);
+
+    auto activeModel = m_session.getActiveAudioModel();
+
+    if (m_viewManager->getPlaySoloMode()) {
+        m_viewManager->setPlaybackModel(activeModel);
+        m_playSource->setSoloModelSet({ activeModel });
+    } else {
+        m_viewManager->setPlaybackModel({});
+        m_playSource->setSoloModelSet({});
+    }
     
     if (wasPlaying) {
         if (scoreLabel != "") {
@@ -6296,8 +6312,6 @@ MainWindow::mainModelChanged(ModelId modelId)
 {
     SVDEBUG << "MainWindow::mainModelChanged" << endl;
     
-    m_panLayer->setModel(modelId);
-
     MainWindowBase::mainModelChanged(modelId);
 
     if (m_playTarget || m_audioIO) {
