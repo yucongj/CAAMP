@@ -4691,29 +4691,6 @@ MainWindow::newSession()
     closeSession();
     stop();
     createDocument();
-/*!!!
-    Pane *pane = m_paneStack->addPane();
-
-    connect(pane, SIGNAL(contextHelpChanged(const QString &)),
-            this, SLOT(contextHelpChanged(const QString &)));
-
-    if (!m_timeRulerLayer) {
-        m_timeRulerLayer = m_document->createMainModelLayer
-            (LayerFactory::TimeRuler);
-    }
-
-    m_document->addLayerToView(pane, m_timeRulerLayer);
-
-    Layer *waveform = m_document->createMainModelLayer(LayerFactory::Waveform);
-    m_document->addLayerToView(pane, waveform);
-
-    m_overview->registerView(pane);
-
-    CommandHistory::getInstance()->clear();
-    CommandHistory::getInstance()->documentSaved();
-    documentRestored();
-    updateMenuStates();
-*/
 }
 
 QString
