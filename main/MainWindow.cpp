@@ -4691,29 +4691,6 @@ MainWindow::newSession()
     closeSession();
     stop();
     createDocument();
-/*!!!
-    Pane *pane = m_paneStack->addPane();
-
-    connect(pane, SIGNAL(contextHelpChanged(const QString &)),
-            this, SLOT(contextHelpChanged(const QString &)));
-
-    if (!m_timeRulerLayer) {
-        m_timeRulerLayer = m_document->createMainModelLayer
-            (LayerFactory::TimeRuler);
-    }
-
-    m_document->addLayerToView(pane, m_timeRulerLayer);
-
-    Layer *waveform = m_document->createMainModelLayer(LayerFactory::Waveform);
-    m_document->addLayerToView(pane, waveform);
-
-    m_overview->registerView(pane);
-
-    CommandHistory::getInstance()->clear();
-    CommandHistory::getInstance()->documentSaved();
-    documentRestored();
-    updateMenuStates();
-*/
 }
 
 QString
@@ -5966,7 +5943,7 @@ MainWindow::currentPaneChanged(Pane *pane)
     // for playback in solo mode, but we want slightly different
     // behaviour from the SV default. While SV solos all models shown
     // in the selected pane, we want always to solo only the current
-    // audio model.
+    // audio model, and any non-audio models derived from it.
 
     updateVisibleRangeDisplay(pane);
     
@@ -5989,23 +5966,6 @@ MainWindow::currentPaneChanged(Pane *pane)
         }
     }
 
-    // If this pane contains the main model, it usually makes sense to
-    // show the main model in the pan layer even if it isn't the top
-    // layer in the pane (e.g. if the top layer is one derived from
-    // the main model).
-    bool containsMainModel = false;
-    for (int i = pane->getLayerCount(); i > 0; ) {
-        --i;
-        Layer *layer = pane->getLayer(i);
-        if (layer &&
-            LayerFactory::getInstance()->getLayerType(layer) ==
-            LayerFactory::Waveform &&
-            layer->getModel() == getMainModelId()) {
-            containsMainModel = true;
-            break;
-        }
-    }
-
     for (int i = pane->getLayerCount(); i > 0; ) {
         --i;
         Layer *layer = pane->getLayer(i);
@@ -6020,11 +5980,24 @@ MainWindow::currentPaneChanged(Pane *pane)
 
     m_session.setActivePane(pane);
 
-    auto activeModel = m_session.getActiveAudioModel();
-
     if (m_viewManager->getPlaySoloMode()) {
+
+        ModelId activeModel = m_session.getActiveAudioModel();
+        std::set<ModelId> soloModels;
+        soloModels.insert(activeModel);
+    
+        for (int i = 0; i < pane->getLayerCount(); ++i ) {
+            Layer *layer = pane->getLayer(i);
+            ModelId modelId = layer->getModel();
+            auto model = ModelById::get(modelId);
+            if (model && model->getSourceModel() == activeModel) {
+                soloModels.insert(modelId);
+            }
+        }
+
         m_viewManager->setPlaybackModel(activeModel);
-        m_playSource->setSoloModelSet({ activeModel });
+        m_playSource->setSoloModelSet(soloModels);
+        
     } else {
         m_viewManager->setPlaybackModel({});
         m_playSource->setSoloModelSet({});
