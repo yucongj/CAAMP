@@ -72,7 +72,6 @@ Session::setDocument(Document *doc,
         m_audioPanes.push_back(mainAudioPane);
     }
     m_featurePane = featurePane;
-    m_activePane = mainAudioPane;
     m_overview = overview;
     m_activePane = mainAudioPane;
     m_timeRulerLayer = timeRuler;
@@ -420,18 +419,24 @@ Session::setActivePane(Pane *pane)
 {
     SVDEBUG << "Session::setActivePane(" << pane << ")" << endl;
     
+    if (!m_document) {
+        // If we're closing a session or exiting entirely, then it can
+        // happen that our document is cleared and setActivePane is
+        // subsequently called simply as an artifact of an active pane
+        // being deleted (so some other pane being made active). In
+        // this situation we want to avoid setting the active pane to
+        // anything, because it isn't going to persist
+        SVDEBUG << "Session::setActivePane: No document, resetting" << endl;
+        m_activePane = nullptr;
+        return;
+    }
+    
     m_activePane = pane;
 
     if (!pane) {
         return;
     }
 
-    if (!m_document) {
-        // May be exiting
-        SVDEBUG << "Session::setActivePane: No document, ignoring" << endl;
-        return;
-    }
-    
     if (pane == m_featurePane) {
         return;
     }
