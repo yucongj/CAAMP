@@ -5966,7 +5966,7 @@ MainWindow::currentPaneChanged(Pane *pane)
     // for playback in solo mode, but we want slightly different
     // behaviour from the SV default. While SV solos all models shown
     // in the selected pane, we want always to solo only the current
-    // audio model.
+    // audio model, and any non-audio models derived from it.
 
     updateVisibleRangeDisplay(pane);
     
@@ -6020,11 +6020,24 @@ MainWindow::currentPaneChanged(Pane *pane)
 
     m_session.setActivePane(pane);
 
-    auto activeModel = m_session.getActiveAudioModel();
-
     if (m_viewManager->getPlaySoloMode()) {
+
+        ModelId activeModel = m_session.getActiveAudioModel();
+        std::set<ModelId> soloModels;
+        soloModels.insert(activeModel);
+    
+        for (int i = 0; i < pane->getLayerCount(); ++i ) {
+            Layer *layer = pane->getLayer(i);
+            ModelId modelId = layer->getModel();
+            auto model = ModelById::get(modelId);
+            if (model && model->getSourceModel() == activeModel) {
+                soloModels.insert(modelId);
+            }
+        }
+
         m_viewManager->setPlaybackModel(activeModel);
-        m_playSource->setSoloModelSet({ activeModel });
+        m_playSource->setSoloModelSet(soloModels);
+        
     } else {
         m_viewManager->setPlaybackModel({});
         m_playSource->setSoloModelSet({});

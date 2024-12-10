@@ -718,6 +718,8 @@ Session::setOnsetsLayerProperties(TimeInstantLayer *onsetsLayer)
         (onsetsLayer->getModel().untyped);
     if (playParams) {
         playParams->setPlayGain(0.1);
+    } else {
+        SVDEBUG << "Session::setOnsetsLayerProperties: WARNING: No play parameters found for model " << onsetsLayer->getModel().untyped << endl;
     }
 }
 
