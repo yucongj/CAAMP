@@ -5982,17 +5982,22 @@ MainWindow::currentPaneChanged(Pane *pane)
 
     if (m_viewManager->getPlaySoloMode()) {
 
+        // We want to solo only the active audio model for the pane
+        // (in case there is more than one audio model here), as well
+        // as any non-audio models that are on top of it
+        
         ModelId activeModel = m_session.getActiveAudioModel();
         std::set<ModelId> soloModels;
         soloModels.insert(activeModel);
     
-        for (int i = 0; i < pane->getLayerCount(); ++i ) {
+        for (int i = pane->getLayerCount(); i > 0; ) {
+            --i;
             Layer *layer = pane->getLayer(i);
             ModelId modelId = layer->getModel();
-            auto model = ModelById::get(modelId);
-            if (model && model->getSourceModel() == activeModel) {
-                soloModels.insert(modelId);
+            if (modelId == activeModel) {
+                break;
             }
+            soloModels.insert(modelId);
         }
 
         m_viewManager->setPlaybackModel(activeModel);
