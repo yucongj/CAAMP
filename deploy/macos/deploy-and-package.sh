@@ -36,7 +36,7 @@ echo "Version: $version"
 
 source="$full_name.app"
 volume="$full_versioned"
-volname="$full_name - $version"
+volname="$full_name $version"
 target="$volume"/"$full_name".app
 dmg="$volume".dmg
 
