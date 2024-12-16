@@ -5993,11 +5993,17 @@ MainWindow::currentPaneChanged(Pane *pane)
         for (int i = pane->getLayerCount(); i > 0; ) {
             --i;
             Layer *layer = pane->getLayer(i);
+            if (layer->isLayerDormant(pane)) {
+                continue;
+            }
             ModelId modelId = layer->getModel();
             if (modelId == activeModel) {
                 break;
             }
             soloModels.insert(modelId);
+            if (ModelById::isa<RangeSummarisableTimeValueModel>(modelId)) {
+                break;
+            }
         }
 
         m_viewManager->setPlaybackModel(activeModel);
