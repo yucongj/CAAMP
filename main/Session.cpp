@@ -1341,7 +1341,6 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
     ModelId tempoModelId = ModelById::add(tempoModel);
     tempoModel->setSourceModel(audioModel);
     m_document->addNonDerivedModel(tempoModelId);
-    m_document->setModel(tempoLayer, tempoModelId);
     
     auto audioPane = getAudioPaneForAudioModel(audioModel);
     if (!audioPane) {
@@ -1407,6 +1406,11 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
             }
         }
     }
+
+    // We must do this after adding all the events, otherwise we get
+    // mired in a series of very slow updates from each time an event
+    // is added
+    m_document->setModel(tempoLayer, tempoModelId);
 }
 
 void
