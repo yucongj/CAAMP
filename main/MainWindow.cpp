@@ -3665,7 +3665,7 @@ MainWindow::connectLayerEditDialog(ModelDataTableDialog *dialog)
 void
 MainWindow::updateMenuStates()
 {
-    SVDEBUG << "MainWindow::updateMenuStates" << endl;
+//    SVDEBUG << "MainWindow::updateMenuStates" << endl;
     
     MainWindowBase::updateMenuStates();
 
@@ -3745,8 +3745,13 @@ MainWindow::updateMenuStates()
     // NB this does not depend on actually having an alignment - we
     // want to be able to export an empty alignment (with every row
     // showing N/N)
-    emit canSaveScoreAlignmentAs(m_session.canExportAlignment());
-    emit canSaveScoreAlignment(m_session.canReExportAlignment());
+    if (m_session.canReExportAlignment()) {
+        emit canSaveScoreAlignmentAs(true);
+        emit canSaveScoreAlignment(true);
+    } else {
+        emit canSaveScoreAlignmentAs(m_session.canExportAlignment());
+        emit canSaveScoreAlignment(false);
+    }
     
     emit canLoadScoreAlignment(true);
 
@@ -3760,7 +3765,7 @@ MainWindow::updateMenuStates()
         }
     }
 
-    SVDEBUG << "for canPropagateAlignment: activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
+//    SVDEBUG << "for canPropagateAlignment: activeModelId = " << activeModelId << ", mainModelId = " << mainModelId << ", activeModelAlignmentComplete = " << activeModelAlignmentComplete << endl;
 
     bool canPropagate =
         haveScore &&
