@@ -4,16 +4,16 @@
       "pin": "63e0c3b37b6fb9ce6f074ea8222b4903e4f5568a"
     },
     "svcore": {
-      "pin": "d3d635bed8b96ffc6f85bf4662342442740e0cc1"
+      "pin": "83195a39dfe87b603424f38646033222d46e8362"
     },
     "svgui": {
-      "pin": "da4f461ad154262be1a4e979dfe176da229faa42"
+      "pin": "843bb82108563044627d5af24b83778e82faebc1"
     },
     "svapp": {
-      "pin": "70bf9c6b9b1a71a68173de0728f67c47342dafaa"
+      "pin": "a26bcdad73f61168a832867ed58cb0037ec29280"
     },
     "checker": {
-      "pin": "fae540cf4a79ac5ed5a4d4dc0df680b1acbe8628"
+      "pin": "5ba274674cf9cbe1eafa2243e1356b2076c3dbd7"
     },
     "sv-dependency-builds": {
       "pin": "01bb14514cdbed5f7741ddad8d0a0e1021fbbcbc"
@@ -25,7 +25,7 @@
       "pin": "3a742c556ac1f2bf9823f30b937c71c690e1f6ae"
     },
     "piper-vamp-cpp": {
-      "pin": "c6519fcb8c926c8331f5e6deb351d738da48600a"
+      "pin": "6f16a09b78b995b3cf2844f00033bde90e5e0936"
     },
     "dataquay": {
       "pin": "3dbf25604e7a"
@@ -46,7 +46,7 @@
       "pin": "017ab3ed3a33"
     },
     "bqaudiostream": {
-      "pin": "243b5dceebcb"
+      "pin": "495b3242c489"
     },
     "bqthingfactory": {
       "pin": "2e4bd170f57f"
