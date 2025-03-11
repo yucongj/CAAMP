@@ -11,6 +11,14 @@ CAAMP: Computer-assisted Annotation and Analysis of Music Performance
 *Performance Precision* needs to be used together with Vamp aligner plugins that can conduct audio-to-score alignment. Existing releases already include a default plugin, [piano aligner](https://github.com/yucongj/piano-aligner). For anyone who would like to develop new aligner plugins for *Performance Precision*, please refer to the later section [Developing Vamp aligner plugins](#developing-vamp-aligner-plugins).
 
 
+<a href="https://www.neh.gov/" title="National Endowment for the Humanities">
+  <img src="logo_neh.jpg" align="left" alt="drawing" width="200" style="margin-right: 20px;" />
+</a>
+<br>
+This project is supported by the National Endowment for the Humanities through a Digital Humanities Advancement Grant.
+
+------
+
 ## How to use *Performance Precision*
 
 ### Loading a score
@@ -79,3 +87,5 @@ If you're not yet familiar with developing Vamp plugins, please refer to the [Va
 Your plugin should provide the alignment result to the host (*Performance Precision*) via an output with the identifier "audio-to-score-alignment" (already specified in `DummyAligner.cpp`).
 
 Your plugin needs to parse and represent scores in the same way as the host. The code is already provided in `Score.h` and `Score.cpp`. A score is represented as a sequence of `MusicalEvent`s, containing each event's score time information and note information, etc. When an MEI score is loaded to the host, the host processes the score (using `verovio`) and writes out some intermediate files for both the host and the plugin to further parse the score. These intermediate files have the file extensions such as `.solo` and `.meter`, and they will be automatically deleted when the score is unloaded. Both the host and the plugin then parse these files to represent the score.
+
+
