@@ -63,8 +63,10 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
     }
 
     double barStart = 1.0;
-    double barEnd = 8.0;
+    double barEnd = 12.0;
 
+    paintBarAndBeatLines(barStart, barEnd, 4.0);
+    
     for (auto c: m_curves) {
         if (auto model = ModelById::getAs<SparseTimeValueModel>(c.second)) {
             paintCurve(model, m_colours[c.first], barStart, barEnd);
@@ -97,6 +99,42 @@ TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
 
     ok = true;
     return double(bar) + double(num) / double(denom);
+}
+
+double
+TempoCurveWidget::barToX(double bar, double barStart, double barEnd) const
+{
+    double margin = 16.0;
+    double w = width() - margin;
+    if (w < 0.0) w = 1.0;
+    return margin + w * ((bar - barStart) / (barEnd - barStart));
+}
+
+void
+TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd,
+                                       int beatsPerBar)
+{
+    QPainter paint(this);
+    paint.setRenderHint(QPainter::Antialiasing, true);
+    paint.setBrush(Qt::NoBrush);
+
+    for (double bar = round(barStart); bar <= barEnd; bar += 1.0) {
+
+        double x = barToX(bar, barStart, barEnd);
+        paint.setPen(Qt::black);
+        paint.drawLine(x, 0, x, height());
+
+        //!!! +font
+        paint.drawText(x + 5, 5 + paint.fontMetrics().ascent(),
+                       QString("%1").arg(int(bar)));
+        
+        for (int i = 1; i < beatsPerBar; ++i) {
+            double barFrac = bar + double(i) / double(beatsPerBar);
+            x = barToX(barFrac, barStart, barEnd);
+            paint.setPen(Qt::gray);
+            paint.drawLine(x, 0, x, height());
+        }
+    }
 }
 
 void
@@ -141,7 +179,7 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
             break;
         }
 
-        double x = w * ((bar - barStart) / (barEnd - barStart));
+        double x = barToX(bar, barStart, barEnd);
         double y = h - (h * ((p.getValue() - minValue) / (maxValue - minValue)));
 
         SVCERR << "frame = " << p.getFrame() << ", label = " << p.getLabel() << ", bar = " << bar

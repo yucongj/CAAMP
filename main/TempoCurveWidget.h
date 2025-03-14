@@ -42,7 +42,11 @@ private:
     std::map<sv::ModelId, QColor> m_colours; // audio model -> colour
     int m_colourCounter;
 
+    double barToX(double bar, double barStart, double barEnd) const;
+    
     double labelToBarAndFraction(QString label, bool *ok) const;
+    void paintBarAndBeatLines(double barStart, double barEnd,
+                              int beatsPerBar); // 0 for no beats
     void paintCurve(std::shared_ptr<sv::SparseTimeValueModel> tempoCurveModel,
                     QColor colour, double barStart, double barEnd);
 };

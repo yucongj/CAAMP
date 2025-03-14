@@ -3132,6 +3132,8 @@ MainWindow::alignmentReadyForReview(Pane *onsetsPane, Layer *onsetsLayer)
     m_alignCommands->hide();
     m_alignAcceptReject->show();
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
@@ -3140,6 +3142,8 @@ MainWindow::alignmentModified()
 {
     SVDEBUG << "MainWindow::alignmentModified" << endl;
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
@@ -3161,6 +3165,8 @@ MainWindow::alignmentAccepted()
 
     m_paneStack->setCurrentLayer(onsetsPane, onsetsLayer);
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
@@ -3182,6 +3188,8 @@ MainWindow::alignmentRejected()
 
     m_paneStack->setCurrentLayer(onsetsPane, onsetsLayer);
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
