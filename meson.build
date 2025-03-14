@@ -1104,6 +1104,7 @@ pp_main_files = [
   'main/ScoreFinder.cpp',
   'main/ScoreParser.cpp',
   'main/ScoreWidget.cpp',
+  'main/TempoCurveWidget.cpp',
   'main/vrvtrim.cpp',
   'piano-aligner/Score.cpp',
 ]
@@ -1459,6 +1460,7 @@ pp_main_moc_files = qt.preprocess(
   'main/PreferencesDialog.h',
   'main/Session.h',
   'main/ScoreWidget.h',
+  'main/TempoCurveWidget.h',
 ])
 
 checker_lib_files = [

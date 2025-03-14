@@ -22,6 +22,7 @@
 #include "PreferencesDialog.h"
 #include "Surveyer.h"
 
+#include "TempoCurveWidget.h"
 #include "ScoreWidget.h"
 #include "Session.h"
 #include "piano-aligner/Score.h"
@@ -225,12 +226,12 @@ protected slots:
     void newerVersionAvailable(QString) override;
 
 protected:
-    sv::Overview                *m_overview;
-    sv::LevelPanToolButton      *m_mainLevelPan;
-    sv::AudioDial               *m_playSpeed;
-    
-    QScrollArea             *m_mainScroll;
+    sv::Overview            *m_overview;
+    sv::LevelPanToolButton  *m_mainLevelPan;
+    sv::AudioDial           *m_playSpeed;
+    TempoCurveWidget        *m_tempoCurveWidget;
     ScoreWidget             *m_scoreWidget;
+    QScrollArea             *m_mainScroll;
     QPushButton             *m_alignButton;
     QPushButton             *m_alignerChoice;
     QWidget                 *m_alignCommands;

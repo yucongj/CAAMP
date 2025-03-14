@@ -40,7 +40,7 @@ Session::Session() :
     m_pendingOnsetsLayer(nullptr)
 {
     SVDEBUG << "Session::Session" << endl;
-    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr);
+    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 Session::~Session()
@@ -54,6 +54,7 @@ void
 Session::setDocument(Document *doc,
                      Pane *mainAudioPane,
                      Pane *featurePane,
+                     TempoCurveWidget *tempoCurveWidget,
                      View *overview,
                      Layer *timeRuler)
 {
@@ -75,6 +76,7 @@ Session::setDocument(Document *doc,
         m_audioPanes.push_back(mainAudioPane);
     }
     m_featurePane = featurePane;
+    m_tempoCurveWidget = tempoCurveWidget;
     m_overview = overview;
     m_activePane = mainAudioPane;
     m_timeRulerLayer = timeRuler;
@@ -93,7 +95,7 @@ Session::setDocument(Document *doc,
 void
 Session::unsetDocument()
 {
-    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr);
+    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 TimeInstantLayer *
@@ -153,8 +155,8 @@ Session::setMainModel(ModelId modelId)
     } else if (m_mainModel.isNone()) {
         SVDEBUG << "Session::setMainModel: WARNING: Cleared main model, but there is a document active" << endl;
         return;
-    } else if (m_audioPanes.empty() || !m_featurePane) {
-        SVDEBUG << "Session::setMainModel: WARNING: Set a main model but we have no audio panes and/or no feature pane" << endl;
+    } else if (m_audioPanes.empty() || !m_featurePane || !m_tempoCurveWidget) {
+        SVDEBUG << "Session::setMainModel: WARNING: Set a main model but we lack one or more of: audio panes, feature pane, tempo curve widget" << endl;
         return;
     }
 

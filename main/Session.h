@@ -27,6 +27,8 @@
 
 #include "piano-aligner/Score.h"
 
+#include "TempoCurveWidget.h"
+
 class Session : public QObject
 {
     Q_OBJECT
@@ -71,7 +73,8 @@ public:
 public slots:
     void setDocument(sv::Document *,
                      sv::Pane *topAudioPane,
-                     sv::Pane *featurePane,
+                     sv::Pane *featurePane, // optional
+                     TempoCurveWidget *tempoCurveWidget,
                      sv::View *overview,
                      sv::Layer *timeRuler);
 
@@ -133,6 +136,7 @@ private:
 
     std::vector<sv::Pane *> m_audioPanes;
     sv::Pane *m_featurePane;
+    TempoCurveWidget *m_tempoCurveWidget;
     sv::View *m_overview;
     sv::Pane *m_activePane; // an alias for one of the panes, or null
     sv::Layer *m_timeRulerLayer;

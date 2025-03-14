@@ -563,6 +563,10 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
 
     m_mainScroll->setWidget(m_paneStack);
 
+    m_tempoCurveWidget = new TempoCurveWidget(frame);
+    int tempoCurveHeight = m_viewManager->scalePixelSize(130);
+    m_tempoCurveWidget->setFixedHeight(tempoCurveHeight); //!!! tbd
+    
     m_overview = new Overview(frame);
     m_overview->setViewManager(m_viewManager);
     int overviewHeight = m_viewManager->scalePixelSize(35);
@@ -607,9 +611,10 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     layout->setSpacing(m_viewManager->scalePixelSize(4));
 
     layout->addWidget(m_mainScroll, 0, 0, 1, 3);
-    layout->addWidget(m_overview, 1, 0);
-    layout->addWidget(m_playSpeed, 1, 1);
-    layout->addWidget(m_mainLevelPan, 1, 2);
+    layout->addWidget(m_tempoCurveWidget, 1, 0, 1, 3);
+    layout->addWidget(m_overview, 2, 0);
+    layout->addWidget(m_playSpeed, 2, 1);
+    layout->addWidget(m_mainLevelPan, 2, 2);
 
     m_playControlsWidth = 
         m_mainLevelPan->width() + m_playSpeed->width() + layout->spacing() * 2;
@@ -4741,7 +4746,7 @@ MainWindow::documentReplaced()
     SVDEBUG << "MainWindow::documentReplaced: Added views, now calling m_session.setDocument" << endl;
     
     m_session.setDocument(m_document, topPane, bottomPane,
-                          m_overview, m_timeRulerLayer);
+                          m_tempoCurveWidget, m_overview, m_timeRulerLayer);
 
     CommandHistory::getInstance()->clear();
     CommandHistory::getInstance()->documentSaved();
