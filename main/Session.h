@@ -47,8 +47,8 @@ public:
     sv::Pane *getPaneContainingOnsetsLayer();
     sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *pane) const;
     
-    sv::TimeValueLayer *getTempoLayerForAudioModel(sv::ModelId);
-    sv::Pane *getPaneContainingTempoLayers();
+//!!!    sv::TimeValueLayer *getTempoLayerForAudioModel(sv::ModelId);
+//    sv::Pane *getPaneContainingTempoLayers();
 
     sv::ModelId getActiveAudioModel() const;
     QString getActiveAudioTitle() const;
@@ -148,7 +148,8 @@ private:
 
     struct FeatureData {
         std::vector<AlignmentEntry> alignmentEntries;
-        sv::TimeValueLayer *tempoLayer;
+//        sv::TimeValueLayer *tempoLayer;
+        sv::ModelId tempoModel;
         sv::WaveformLayer *overviewLayer;
         QString lastExportedTo;
         bool alignmentModified;
@@ -173,7 +174,7 @@ private:
     void alignmentComplete();
     void mergeLayers(sv::TimeInstantLayer *from, sv::TimeInstantLayer *to,
                      sv::sv_frame_t overlapStart, sv::sv_frame_t overlapEnd);
-    void recalculateTempoLayerFor(sv::ModelId audioModel);
+    void recalculateTempoCurveFor(sv::ModelId audioModel);
     void updateOnsetColours();
 
     bool updateAlignmentEntriesFor(sv::ModelId audioModel);

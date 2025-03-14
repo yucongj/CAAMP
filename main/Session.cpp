@@ -45,6 +45,9 @@ Session::Session() :
 
 Session::~Session()
 {
+    for (auto f : m_featureData) {
+        ModelById::release(f.second.tempoModel);
+    }
 }
 
 void
@@ -111,7 +114,7 @@ Session::getReferencePane() const
 {
     return getAudioPaneForAudioModel(m_mainModel);
 }
-
+/*!!!
 TimeValueLayer *
 Session::getTempoLayerForAudioModel(ModelId model)
 {
@@ -127,7 +130,7 @@ Session::getPaneContainingTempoLayers()
 {
     return m_featurePane;
 }
-
+*/
 void
 Session::setMainModel(ModelId modelId)
 {
@@ -193,7 +196,7 @@ Session::setMainModel(ModelId modelId)
 
     m_featureData[m_mainModel] = {
         {},                 // alignmentEntries
-        nullptr,            // tempoLayer
+        {},                 // tempoModel
         overviewLayer,      // overviewLayer
         {},                 // lastExportedTo
         false               // alignmentModified
@@ -407,7 +410,7 @@ Session::addFurtherAudioPane(Pane *audioPane)
     
     m_featureData[modelId] = {
         {},                 // alignmentEntries
-        nullptr,            // tempoLayer
+        {},                 // tempoModel
         overviewLayer,      // overviewLayer
         {},                 // lastExportedTo
         false               // alignmentModified
@@ -616,6 +619,7 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     if (onsetsLayer) {
         onsetsLayer->showLayer(activeAudioPane, false);
     }
+    /*!!!
     if (m_featurePane) {
         if (m_featureData.find(activeModelId) != m_featureData.end()) {
             auto tempoLayer = m_featureData.at(activeModelId).tempoLayer;
@@ -624,7 +628,7 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
             }
         }
     }
-    
+    */
     Transform::ParameterMap params {
         { "score-position-start-numerator", scorePositionStartNumerator },
         { "score-position-start-denominator", scorePositionStartDenominator },
@@ -751,7 +755,7 @@ Session::modelChanged(ModelId id)
             getAudioModelFromPane(p);
 
         if (onsetsLayer && !audioModelId.isNone()) {
-            recalculateTempoLayerFor(audioModelId);
+            recalculateTempoCurveFor(audioModelId);
             emit alignmentModified();
         }
     }
@@ -768,7 +772,7 @@ Session::alignmentComplete()
 {
     SVDEBUG << "Session::alignmentComplete" << endl;
 
-    recalculateTempoLayerFor(m_audioModelForPendingOnsets);
+    recalculateTempoCurveFor(m_audioModelForPendingOnsets);
     updateOnsetColours();
     
     emit alignmentReadyForReview(m_pendingOnsetsPane, m_pendingOnsetsLayer);
@@ -893,7 +897,7 @@ Session::rejectAlignment()
 
     m_pendingOnsetsLayer = nullptr;
     
-    recalculateTempoLayerFor(m_audioModelForPendingOnsets);
+    recalculateTempoCurveFor(m_audioModelForPendingOnsets);
     updateOnsetColours();
     
     m_audioModelForPendingOnsets = {};
@@ -932,7 +936,7 @@ Session::acceptAlignment()
     
     m_pendingOnsetsLayer = nullptr;
     
-    recalculateTempoLayerFor(m_audioModelForPendingOnsets);
+    recalculateTempoCurveFor(m_audioModelForPendingOnsets);
     updateOnsetColours();
     
     emit alignmentAccepted();
@@ -1213,7 +1217,7 @@ Session::importAlignmentFrom(QString path)
 
     delete imported;
 
-    recalculateTempoLayerFor(audioModelId);
+    recalculateTempoCurveFor(audioModelId);
     updateOnsetColours();
     emit alignmentAccepted();    
 
@@ -1295,24 +1299,24 @@ Session::updateAlignmentEntriesFor(ModelId audioModelId)
 }
 
 void
-Session::recalculateTempoLayerFor(ModelId audioModel)
+Session::recalculateTempoCurveFor(ModelId audioModel)
 {
     if (audioModel.isNone()) return;
 
-    TimeValueLayer *tempoLayer = nullptr;
-    
     if (m_featureData.find(audioModel) == m_featureData.end()) {
         m_featureData[audioModel] = {
             {},                 // alignmentEntries
-            nullptr,            // tempoLayer
+            {},                 // tempoModel
             nullptr,            // overviewLayer
             {},                 // lastExportedTo
             false               // alignmentModified
         };
+    } else {
+        ModelById::release(m_featureData[audioModel].tempoModel);
     }
     
     m_featureData.at(audioModel).alignmentModified = true;
-
+/*!!!
     if (!m_featureData.at(audioModel).tempoLayer) {
         tempoLayer = qobject_cast<TimeValueLayer *>
             (m_document->createLayer(LayerFactory::TimeValues));
@@ -1335,16 +1339,17 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
             m_document->addLayerToView(m_featurePane, tempoLayer);
         }
     }
-        
+*/        
     sv_samplerate_t sampleRate = ModelById::get(audioModel)->getSampleRate();
     auto tempoModel = make_shared<SparseTimeValueModel>(sampleRate, 1);
     ModelId tempoModelId = ModelById::add(tempoModel);
+    m_featureData[audioModel].tempoModel = tempoModelId;
     tempoModel->setSourceModel(audioModel);
-    m_document->addNonDerivedModel(tempoModelId);
+//    m_document->addNonDerivedModel(tempoModelId);
     
     auto audioPane = getAudioPaneForAudioModel(audioModel);
     if (!audioPane) {
-        SVDEBUG << "Session::recalculateTempoLayer: No audio pane for model "
+        SVDEBUG << "Session::recalculateTempoCurve: No audio pane for model "
                 << audioModel << endl;
         return;
     }
@@ -1352,13 +1357,13 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
     auto onsetsLayer = getOnsetsLayerFromPane
         (audioPane, OnsetsLayerSelection::PermitPendingOnsets);
     if (!onsetsLayer) {
-        SVDEBUG << "Session::recalculateTempoLayer: No onsets layer in pane for audio model "
+        SVDEBUG << "Session::recalculateTempoCurve: No onsets layer in pane for audio model "
                 << audioModel << endl;
         return;
     }
 
     if (!updateAlignmentEntriesFor(audioModel)) {
-        SVDEBUG << "Session::recalculateTempoLayer: Failed to update alignment entries" << endl;
+        SVDEBUG << "Session::recalculateTempoCurve: Failed to update alignment entries" << endl;
         return;
     }
         
@@ -1410,7 +1415,7 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
     // We must do this after adding all the events, otherwise we get
     // mired in a series of very slow updates from each time an event
     // is added
-    m_document->setModel(tempoLayer, tempoModelId);
+//!!!    m_document->setModel(tempoLayer, tempoModelId);
 }
 
 void
