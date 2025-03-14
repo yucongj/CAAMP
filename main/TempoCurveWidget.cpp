@@ -12,8 +12,16 @@
 
 #include "TempoCurveWidget.h"
 
+#include "svgui/layer/ColourDatabase.h"
+
+#include <QPainter>
+
+using namespace std;
+using namespace sv;
+
 TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
-    QFrame(parent)
+    QFrame(parent),
+    m_colourCounter(0)
 {
 }
 
@@ -22,14 +30,139 @@ TempoCurveWidget::~TempoCurveWidget()
 }
 
 void
-TempoCurveWidget::addCurve(sv::ModelId audioModel, sv::ModelId tempoModel)
+TempoCurveWidget::setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoModel)
 {
     m_curves[audioModel] = tempoModel;
+
+    ColourDatabase *cdb = ColourDatabase::getInstance();
+    QColor colour = Qt::black;
+
+    while (colour == Qt::black || colour == Qt::white) {
+        colour = cdb->getColour(m_colourCounter % cdb->getColourCount());
+        ++m_colourCounter;
+    }
+    
+    m_colours[audioModel] = colour;
 }
 
 void
-TempoCurveWidget::removeCurve(sv::ModelId audioModel)
+TempoCurveWidget::unsetCurveForAudio(sv::ModelId audioModel)
 {
     m_curves.erase(audioModel);
+    m_colours.erase(audioModel);
 }
+
+void
+TempoCurveWidget::paintEvent(QPaintEvent *e)
+{
+    QFrame::paintEvent(e);
+
+    {
+        QPainter paint(this);
+        paint.fillRect(rect(), Qt::white);
+    }
+
+    double barStart = 1.0;
+    double barEnd = 8.0;
+
+    for (auto c: m_curves) {
+        if (auto model = ModelById::getAs<SparseTimeValueModel>(c.second)) {
+            paintCurve(model, m_colours[c.first], barStart, barEnd);
+        }
+    }
+}
+
+double
+TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
+{
+    bool okv = false;
+    bool &ok = (okp ? *okp : okv);
+    
+    ok = false;
+
+    QStringList barAndFraction = label.split("+");
+    if (barAndFraction.size() != 2) return 0.0;
+
+    int bar = barAndFraction[0].toInt(&ok);
+    if (!ok) return 0.0;
+
+    QStringList numAndDenom = barAndFraction[1].split("/");
+    if (numAndDenom.size() != 2) return 0.0;
+
+    int num = numAndDenom[0].toInt(&ok);
+    if (!ok) return 0.0;
+    
+    int denom = numAndDenom[1].toInt(&ok);
+    if (!ok) return 0.0;
+
+    ok = true;
+    return double(bar) + double(num) / double(denom);
+}
+
+void
+TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
+                             QColor colour, double barStart, double barEnd)
+{
+    QPainter paint(this);
+    paint.setRenderHint(QPainter::Antialiasing, true);
+    paint.setBrush(Qt::NoBrush);
+     
+    EventVector points(model->getAllEvents()); //!!! for now...
+
+    double w = width();
+    double h = height();
+
+    double maxValue = model->getValueMaximum();
+    double minValue = model->getValueMinimum();
+    if (maxValue <= minValue) maxValue = minValue + 1.0;
+
+    double px = 0.0;
+    double py = 0.0;
+    bool first = true;
+
+    QPen pointPen(colour, 4.0);
+    pointPen.setCapStyle(Qt::RoundCap);
+    QPen linePen(colour, 1.0);
+    
+    for (auto p : points) {
+        
+        bool ok = false;
+        double bar = labelToBarAndFraction(p.getLabel(), &ok);
+        
+        if (!ok) {
+            SVDEBUG << "TempoCurveWidget::paintCurve: Failed to parse bar and fraction \"" << p.getLabel() << "\"" << endl;
+            continue;
+        }
+        // For now we show an arbitrary fixed bar range 0-5
+        if (bar < barStart) {
+            continue;
+        }
+        if (bar > barEnd) {
+            break;
+        }
+
+        double x = w * ((bar - barStart) / (barEnd - barStart));
+        double y = h - (h * ((p.getValue() - minValue) / (maxValue - minValue)));
+
+        SVCERR << "frame = " << p.getFrame() << ", label = " << p.getLabel() << ", bar = " << bar
+               << ", value = " << p.getValue() << ", minValue = " << minValue
+               << ", maxValue = " << maxValue << ", w = " << w << ", h = "
+               << h << ", x = " << x << ", y = " << y << endl;
+        
+        if (!first) {
+            paint.setPen(linePen);
+            paint.drawLine(px, py, x, y);
+        }
+            
+        paint.setPen(pointPen);
+        paint.drawPoint(x, y);
+
+        px = x;
+        py = y;
+        first = false;
+    }
+
+}
+
+
 

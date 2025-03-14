@@ -1405,7 +1405,8 @@ Session::recalculateTempoCurveFor(ModelId audioModel)
                     prev = -1;
                 }
                 double tempo = (4. * dur.numerator / dur.denominator) * 60. / (nextSec - thisSec); // num of quarter notes per minutes
-                Event tempoEvent(thisFrame, float(tempo), QString());
+                Event tempoEvent(thisFrame, float(tempo),
+                                 QString::fromStdString(alignmentEntries[i].label));
                 tempoModel->add(tempoEvent);
             }
             if (i + 1 == end) {
@@ -1418,6 +1419,9 @@ Session::recalculateTempoCurveFor(ModelId audioModel)
     // mired in a series of very slow updates from each time an event
     // is added
 //!!!    m_document->setModel(tempoLayer, tempoModelId);
+    if (m_tempoCurveWidget) {
+        m_tempoCurveWidget->setCurveForAudio(audioModel, tempoModelId);
+    }
 }
 
 void

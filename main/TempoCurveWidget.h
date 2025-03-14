@@ -16,10 +16,12 @@
 #include <QTemporaryDir>
 #include <QFrame>
 #include <QTimer>
+#include <QColor>
 
 #include <map>
 
 #include "data/model/Model.h"
+#include "data/model/SparseTimeValueModel.h"
 
 class TempoCurveWidget : public QFrame
 {
@@ -29,12 +31,20 @@ public:
     TempoCurveWidget(QWidget *parent = 0);
     virtual ~TempoCurveWidget();
 
-    void addCurve(sv::ModelId audioModel, sv::ModelId tempoModel);
-    void removeCurve(sv::ModelId audioModel);
+    void setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoModel);
+    void unsetCurveForAudio(sv::ModelId audioModel);
+
+protected:
+    void paintEvent(QPaintEvent *e) override;
 
 private:
     std::map<sv::ModelId, sv::ModelId> m_curves; // audio model -> tempo model
+    std::map<sv::ModelId, QColor> m_colours; // audio model -> colour
+    int m_colourCounter;
 
+    double labelToBarAndFraction(QString label, bool *ok) const;
+    void paintCurve(std::shared_ptr<sv::SparseTimeValueModel> tempoCurveModel,
+                    QColor colour, double barStart, double barEnd);
 };
 
 #endif
