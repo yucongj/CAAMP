@@ -22,7 +22,7 @@ qt = import('qt6')
 qt_dep = dependency(
   'qt6',
   modules: [
-    'Core', 'Gui', 'Widgets', 'Xml', 'Network', 'Svg', 'Test', 'Pdf',
+    'Core', 'Gui', 'Widgets', 'Xml', 'Network', 'Svg', 'Test',
   ],
   main: true
 )
