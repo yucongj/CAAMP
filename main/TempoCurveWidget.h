@@ -34,6 +34,9 @@ public:
     void setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoModel);
     void unsetCurveForAudio(sv::ModelId audioModel);
 
+public slots:
+    void setHighlightedPosition(QString label);
+    
 protected:
     void paintEvent(QPaintEvent *e) override;
 
@@ -41,6 +44,7 @@ private:
     std::map<sv::ModelId, sv::ModelId> m_curves; // audio model -> tempo model
     std::map<sv::ModelId, QColor> m_colours; // audio model -> colour
     int m_colourCounter;
+    double m_highlightedPosition;
 
     double barToX(double bar, double barStart, double barEnd) const;
     

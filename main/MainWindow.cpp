@@ -2781,6 +2781,7 @@ MainWindow::highlightFrameInScore(sv_frame_t frame)
         return;
     }
     m_scoreWidget->setHighlightEventByLabel(label.toStdString());
+    m_tempoCurveWidget->setHighlightedPosition(label);
 }
 
 void

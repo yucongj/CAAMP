@@ -21,7 +21,8 @@ using namespace sv;
 
 TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     QFrame(parent),
-    m_colourCounter(0)
+    m_colourCounter(0),
+    m_highlightedPosition(-1.0)
 {
 }
 
@@ -53,6 +54,24 @@ TempoCurveWidget::unsetCurveForAudio(sv::ModelId audioModel)
 }
 
 void
+TempoCurveWidget::setHighlightedPosition(QString label)
+{
+    SVDEBUG << "TempoCurveWidget::setHighlightedPosition("
+            << label << ")" << endl;
+
+    bool ok = false;
+    double bar = labelToBarAndFraction(label, &ok);
+    if (!ok) {
+        SVDEBUG << "TempoCurveWidget::setHighlightedPosition: unable to parse "
+                << "label \"" << label << "\"" << endl;
+        return;
+    }
+
+    m_highlightedPosition = bar;
+    update();
+}
+
+void
 TempoCurveWidget::paintEvent(QPaintEvent *e)
 {
     QFrame::paintEvent(e);
@@ -71,6 +90,16 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         if (auto model = ModelById::getAs<SparseTimeValueModel>(c.second)) {
             paintCurve(model, m_colours[c.first], barStart, barEnd);
         }
+    }
+
+    if (m_highlightedPosition >= 0.0) {
+        double x = barToX(m_highlightedPosition, barStart, barEnd);
+        QPainter paint(this);
+        QColor highlightColour("#59c4df");
+        highlightColour.setAlpha(160);
+        paint.setPen(Qt::NoPen);
+        paint.setBrush(highlightColour);
+        paint.drawRect(QRectF(x, 0.0, 10.0, height()));
     }
 }
 
