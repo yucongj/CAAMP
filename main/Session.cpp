@@ -90,6 +90,19 @@ Session::setDocument(Document *doc,
 
     m_featureData.clear();
     m_inEditMode = false;
+
+    if (mainAudioPane) {
+        connect(mainAudioPane, &View::centreFrameChanged,
+                this, &Session::paneCentreOrZoomChanged);
+        connect(mainAudioPane, &View::zoomLevelChanged,
+                this, &Session::paneCentreOrZoomChanged);
+    }
+    if (featurePane) {
+        connect(featurePane, &View::centreFrameChanged,
+                this, &Session::paneCentreOrZoomChanged);
+        connect(featurePane, &View::zoomLevelChanged,
+                this, &Session::paneCentreOrZoomChanged);
+    }
 }
 
 void
@@ -417,6 +430,11 @@ Session::addFurtherAudioPane(Pane *audioPane)
         {},                 // lastExportedTo
         false               // alignmentModified
     };
+
+    connect(audioPane, &View::centreFrameChanged,
+            this, &Session::paneCentreOrZoomChanged);
+    connect(audioPane, &View::zoomLevelChanged,
+            this, &Session::paneCentreOrZoomChanged);
 }
 
 void
@@ -446,8 +464,8 @@ Session::setActivePane(Pane *pane)
         return;
     }
 
-    auto audioModel = getAudioModelFromPane(pane);
-    if (audioModel.isNone()) {
+    ModelId audioModelId = getAudioModelFromPane(pane);
+    if (audioModelId.isNone()) {
         return;
     }
     
@@ -464,14 +482,49 @@ Session::setActivePane(Pane *pane)
             auto waveform = qobject_cast<WaveformLayer *>(layer);
             if (waveform) {
                 waveform->showLayer
-                    (view, waveform->getModel() == audioModel);
+                    (view, waveform->getModel() == audioModelId);
             }
             auto tempo = qobject_cast<TimeValueLayer *>(layer);
             if (tempo) {
                 tempo->showLayer
-                    (view, tempo->getSourceModel() == audioModel);
+                    (view, tempo->getSourceModel() == audioModelId);
             }
         }
+    }
+
+    updateTempoCurveExtentsFromActivePane();
+}
+
+void
+Session::paneCentreOrZoomChanged()
+{
+    Pane *pane = dynamic_cast<Pane *>(sender());
+    if (!pane) {
+        SVDEBUG << "Session::paneCentreOrZoomChanged: sender is not a pane"
+                << endl;
+        return;
+    }
+    if (pane == m_activePane) {
+        updateTempoCurveExtentsFromActivePane();
+    }
+}
+
+void
+Session::updateTempoCurveExtentsFromActivePane()
+{
+    if (!m_activePane) {
+        return;
+    }
+    
+    ModelId audioModelId = getAudioModelFromPane(m_activePane);
+    if (audioModelId.isNone()) {
+        return;
+    }
+    
+    if (m_tempoCurveWidget) {
+        m_tempoCurveWidget->setCurrentAudioModel(audioModelId);
+        m_tempoCurveWidget->setAudioModelDisplayedRange
+            (m_activePane->getStartFrame(), m_activePane->getEndFrame());
     }
 }
 

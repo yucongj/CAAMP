@@ -125,6 +125,7 @@ protected slots:
     void modelChanged(sv::ModelId);
     void modelChangedWithin(sv::ModelId, sv::sv_frame_t, sv::sv_frame_t);
     void modelReady(sv::ModelId);
+    void paneCentreOrZoomChanged();
     
 private:
     // I don't own any of these. The SV main window owns the document
@@ -180,6 +181,8 @@ private:
                      sv::sv_frame_t overlapStart, sv::sv_frame_t overlapEnd);
     void recalculateTempoCurveFor(sv::ModelId audioModel);
     void updateOnsetColours();
+
+    void updateTempoCurveExtentsFromActivePane();
 
     bool updateAlignmentEntriesFor(sv::ModelId audioModel);
     bool exportAlignmentEntries(sv::ModelId fromAudioModel, QString toFilePath);

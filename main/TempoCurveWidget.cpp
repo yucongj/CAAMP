@@ -22,7 +22,9 @@ using namespace sv;
 TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     QFrame(parent),
     m_colourCounter(0),
-    m_highlightedPosition(-1.0)
+    m_highlightedPosition(-1.0),
+    m_audioModelDisplayBegin(0),
+    m_audioModelDisplayEnd(0)
 {
 }
 
@@ -72,6 +74,21 @@ TempoCurveWidget::setHighlightedPosition(QString label)
 }
 
 void
+TempoCurveWidget::setCurrentAudioModel(ModelId model)
+{
+    m_currentAudioModel = model;
+    update();
+}
+
+void
+TempoCurveWidget::setAudioModelDisplayedRange(sv_frame_t begin, sv_frame_t end)
+{
+    m_audioModelDisplayBegin = begin;
+    m_audioModelDisplayEnd = end;
+    update();
+}
+
+void
 TempoCurveWidget::paintEvent(QPaintEvent *e)
 {
     QFrame::paintEvent(e);
@@ -81,9 +98,17 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         paint.fillRect(rect(), Qt::white);
     }
 
-    double barStart = 1.0;
-    double barEnd = 12.0;
-
+    double barStart = frameToBarAndFraction(m_audioModelDisplayBegin,
+                                            m_currentAudioModel);
+    double barEnd = frameToBarAndFraction(m_audioModelDisplayEnd,
+                                          m_currentAudioModel);
+    if (barEnd <= 1.0) {
+        return;
+    }
+    if (barStart < 1.0) {
+        barStart = 1.0;
+    }
+    
     paintBarAndBeatLines(barStart, barEnd, 4.0);
     
     for (auto c: m_curves) {
@@ -101,6 +126,33 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         paint.setBrush(highlightColour);
         paint.drawRect(QRectF(x, 0.0, 10.0, height()));
     }
+}
+
+double
+TempoCurveWidget::frameToBarAndFraction(sv_frame_t frame, ModelId audioModelId)
+    const
+{
+    if (m_curves.find(audioModelId) == m_curves.end()) {
+        return 0.0;
+    }
+    auto tempoModel = ModelById::getAs<SparseTimeValueModel>
+        (m_curves.at(audioModelId));
+    if (!tempoModel) {
+        return 0.0;
+    }
+    Event event;
+    if (!tempoModel->getNearestEventMatching(frame,
+                                             [](Event) { return true; },
+                                             EventSeries::Backward,
+                                             event)) {
+        return 0.0;
+    }
+    bool ok = false;
+    double bar = labelToBarAndFraction(event.getLabel(), &ok);
+    if (!ok) {
+        return 0.0;
+    }
+    return bar;
 }
 
 double
@@ -147,7 +199,7 @@ TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd,
     paint.setRenderHint(QPainter::Antialiasing, true);
     paint.setBrush(Qt::NoBrush);
 
-    for (double bar = round(barStart); bar <= barEnd; bar += 1.0) {
+    for (double bar = floor(barStart); bar <= barEnd; bar += 1.0) {
 
         double x = barToX(bar, barStart, barEnd);
         paint.setPen(Qt::black);

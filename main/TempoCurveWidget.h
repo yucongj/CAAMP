@@ -36,6 +36,8 @@ public:
 
 public slots:
     void setHighlightedPosition(QString label);
+    void setCurrentAudioModel(sv::ModelId audioModel);
+    void setAudioModelDisplayedRange(sv::sv_frame_t begin, sv::sv_frame_t end);
     
 protected:
     void paintEvent(QPaintEvent *e) override;
@@ -45,9 +47,14 @@ private:
     std::map<sv::ModelId, QColor> m_colours; // audio model -> colour
     int m_colourCounter;
     double m_highlightedPosition;
+    sv::ModelId m_currentAudioModel;
+    sv::sv_frame_t m_audioModelDisplayBegin;
+    sv::sv_frame_t m_audioModelDisplayEnd;
 
     double barToX(double bar, double barStart, double barEnd) const;
-    
+
+    double frameToBarAndFraction(sv::sv_frame_t frame,
+                                 sv::ModelId audioModel) const;
     double labelToBarAndFraction(QString label, bool *ok) const;
     void paintBarAndBeatLines(double barStart, double barEnd,
                               int beatsPerBar); // 0 for no beats
