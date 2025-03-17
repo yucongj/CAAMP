@@ -325,7 +325,7 @@ ScoreWidget::findSystemExtents(QByteArray svgData, shared_ptr<QSvgRenderer> rend
     // still don't think it's a significant overhead
     
     QDomDocument doc;
-    doc.setContent(svgData, false);
+    doc.setContent(svgData);
 
     Extent currentExtent;
     vector<double> staffLines;
@@ -457,8 +457,10 @@ ScoreWidget::setMusicalEvents(const Score::MusicalEventList &events)
 {
     m_musicalEvents = events;
 
+#ifdef DEBUG_SCORE_WIDGET
     SVDEBUG << "ScoreWidget::setMusicalEvents: " << events.size()
             << " events" << endl;
+#endif
 
     m_idDataMap.clear();
     m_labelIdMap.clear();
@@ -517,7 +519,9 @@ ScoreWidget::setMusicalEvents(const Score::MusicalEventList &events)
         ++ix;
     }
 
+#ifdef DEBUG_SCORE_WIDGET
     SVDEBUG << "ScoreWidget::setMusicalEvents: Done" << endl;
+#endif
 }
 
 void
@@ -574,8 +578,10 @@ ScoreWidget::mouseMoveEvent(QMouseEvent *e)
 
     m_eventUnderMouse = getEventAtPoint(e->pos());
 
+#ifdef DEBUG_SCORE_WIDGET
     SVDEBUG << "ScoreWidget::mouseMoveEvent: id under mouse = "
             << m_eventUnderMouse.id << endl;
+#endif
     
     update();
 
@@ -877,8 +883,10 @@ ScoreWidget::paintEvent(QPaintEvent *e)
     double ww = widgetSize.width(), wh = widgetSize.height();
     double pw = pageSize.width(), ph = pageSize.height();
 
+#ifdef DEBUG_SCORE_WIDGET
     SVDEBUG << "ScoreWidget::paint: widget size " << ww << "x" << wh
             << ", page size " << pw << "x" << ph << endl;
+#endif
     
     if (!ww || !wh || !pw || !ph) {
         SVDEBUG << "ScoreWidgetPDF::paint: one of our dimensions is zero, can't proceed" << endl;
@@ -906,12 +914,16 @@ ScoreWidget::paintEvent(QPaintEvent *e)
 
         if (m_mouseActive) {
             event = m_eventUnderMouse;
+#ifdef DEBUG_SCORE_WIDGET
             SVDEBUG << "ScoreWidget::paint: under mouse = "
                     << event.label << endl;
+#endif
         } else {
             event = m_eventToHighlight;
+#ifdef DEBUG_SCORE_WIDGET
             SVDEBUG << "ScoreWidget::paint: to highlight = "
                     << event.label << endl;
+#endif
         }
 
         if (!event.isNull()) {
@@ -983,6 +995,7 @@ ScoreWidget::paintEvent(QPaintEvent *e)
                              m_selectEnd.location, inclusiveComparator);
         }
 
+#ifdef DEBUG_SCORE_WIDGET
         SVDEBUG << "ScoreWidget::paint: selection spans from "
                 << m_selectStart.location << " to " << m_selectEnd.location
                 << " giving us iterators at "
@@ -994,6 +1007,7 @@ ScoreWidget::paintEvent(QPaintEvent *e)
                     i1->notes.empty() ? "(location without note)" :
                     i1->notes[0].noteId)
                 << endl;
+#endif
 
         double lineOrigin = m_pageToWidget.map(QPointF(0, 0)).x();
         double lineWidth = m_pageToWidget.map(QPointF(pageSize.width(), 0)).x();
@@ -1096,8 +1110,10 @@ ScoreWidget::setHighlightEventByLabel(EventLabel label)
 
     m_highlightEventLabel = label;
     
+#ifdef DEBUG_SCORE_WIDGET
     SVDEBUG << "ScoreWidget::setHighlightEventByLabel: Event with label \""
             << label << "\" found at " << m_eventToHighlight.location << endl;
+#endif
     
     int page = m_eventToHighlight.page;
     if (page != m_page) {

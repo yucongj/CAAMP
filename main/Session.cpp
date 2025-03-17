@@ -978,23 +978,23 @@ bool
 Session::canExportAlignment() const
 {
     if (m_scoreId == "") {
-        SVDEBUG << "Session::canExportAlignment: No, no score ID set" << endl;
+//        SVDEBUG << "Session::canExportAlignment: No, no score ID set" << endl;
         return false;
     }
     if (m_musicalEvents.empty()) {
-        SVDEBUG << "Session::canExportAlignment: No, no musical events set" << endl;
+//        SVDEBUG << "Session::canExportAlignment: No, no musical events set" << endl;
         return false;
     }
     auto modelId = getActiveAudioModel();
     if (modelId.isNone()) {
-        SVDEBUG << "Session::canExportAlignment: No, no active audio model" << endl;
+//        SVDEBUG << "Session::canExportAlignment: No, no active audio model" << endl;
         return false;
     }
     if (m_featureData.find(modelId) == m_featureData.end()) {
-        SVDEBUG << "Session::canExportAlignment: No, no feature data" << endl;
+//        SVDEBUG << "Session::canExportAlignment: No, no feature data" << endl;
         return false;
     }
-    SVDEBUG << "Session::canExportAlignment: Yes" << endl;
+//    SVDEBUG << "Session::canExportAlignment: Yes" << endl;
     return true;
 }
 
@@ -1006,13 +1006,13 @@ Session::canReExportAlignment() const
     }
     auto modelId = getActiveAudioModel();
     if (m_featureData.at(modelId).lastExportedTo == "") {
-        SVDEBUG << "Session::canReExportAlignment: No, we have no filename"
-                << endl;
+//        SVDEBUG << "Session::canReExportAlignment: No, we have no filename"
+//                << endl;
         return false;
     }
     if (!m_featureData.at(modelId).alignmentModified) {
-        SVDEBUG << "Session::canReExportAlignment: No, it hasn't been modified"
-                << endl;
+//        SVDEBUG << "Session::canReExportAlignment: No, it hasn't been modified"
+//                << endl;
         return false;
     }
     return true;
@@ -1310,7 +1310,7 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
             false               // alignmentModified
         };
     }
-
+    
     m_featureData.at(audioModel).alignmentModified = true;
 
     if (!m_featureData.at(audioModel).tempoLayer) {
@@ -1341,7 +1341,6 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
     ModelId tempoModelId = ModelById::add(tempoModel);
     tempoModel->setSourceModel(audioModel);
     m_document->addNonDerivedModel(tempoModelId);
-    m_document->setModel(tempoLayer, tempoModelId);
     
     auto audioPane = getAudioPaneForAudioModel(audioModel);
     if (!audioPane) {
@@ -1407,6 +1406,11 @@ Session::recalculateTempoLayerFor(ModelId audioModel)
             }
         }
     }
+
+    // We must do this after adding all the events, otherwise we get
+    // mired in a series of very slow updates from each time an event
+    // is added
+    m_document->setModel(tempoLayer, tempoModelId);
 }
 
 void
