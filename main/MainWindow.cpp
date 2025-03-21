@@ -2707,8 +2707,10 @@ MainWindow::openScoreFile(QString scoreName, QString scoreFile)
         SVCERR << "MainWindow::chooseScore: Failed to load meter data from meter file path \"" << meterPath << "\"" << endl;
         return;
     }
-    m_session.setMusicalEvents(m_scoreId, m_score.getMusicalEvents());
-    m_scoreWidget->setMusicalEvents(m_score.getMusicalEvents());
+    auto musicalEvents = m_score.getMusicalEvents();
+    m_session.setMusicalEvents(m_scoreId, musicalEvents);
+    m_scoreWidget->setMusicalEvents(musicalEvents);
+    m_tempoCurveWidget->setMusicalEvents(musicalEvents);
 
     auto recordingDirectory =
         ScoreFinder::getUserRecordingDirectory(scoreName.toStdString(), false);

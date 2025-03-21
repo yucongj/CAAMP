@@ -33,6 +33,37 @@ TempoCurveWidget::~TempoCurveWidget()
 }
 
 void
+TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
+{
+    m_musicalEvents = musicalEvents;
+    m_timeSignatures.clear();
+    pair<int, int> prev(4, 4);
+    int nbars = 0;
+    for (const auto &e : m_musicalEvents) {
+        int bar = e.measureInfo.measureNumber;
+        pair<int, int> sig(e.meterNumer, e.meterDenom);
+        // we want m_timeSignatures[bar] to be correct for bar, but
+        // m_timeSignatures is zero-indexed and bar is not, so we need
+        // one more than we might think - hence <= rather than < in
+        // the following
+        while (nbars <= bar) {
+            m_timeSignatures.push_back(prev);
+            ++nbars;
+        }
+        m_timeSignatures[bar] = sig;
+        prev = sig;
+    }
+    SVDEBUG << "setMusicalEvents: time sigs:" << endl;
+    for (int i = 0; i < m_timeSignatures.size(); ++i) {
+        SVDEBUG << i << ": " << m_timeSignatures[i].first << "/"
+                << m_timeSignatures[i].second << endl;
+    }
+
+    m_curves.clear();
+    m_colours.clear();
+}
+
+void
 TempoCurveWidget::setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoModel)
 {
     m_curves[audioModel] = tempoModel;
@@ -53,6 +84,18 @@ TempoCurveWidget::unsetCurveForAudio(sv::ModelId audioModel)
 {
     m_curves.erase(audioModel);
     m_colours.erase(audioModel);
+}
+
+pair<int, int>
+TempoCurveWidget::getTimeSignature(int bar) const
+{
+    pair<int, int> sig { 4, 4 };
+    if (in_range_for(m_timeSignatures, bar)) {
+        sig = m_timeSignatures.at(bar);
+    } else if (!m_timeSignatures.empty()) {
+        sig = *m_timeSignatures.rbegin();
+    }
+    return sig;
 }
 
 void
@@ -109,7 +152,7 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         barStart = 1.0;
     }
     
-    paintBarAndBeatLines(barStart, barEnd, 4.0);
+    paintBarAndBeatLines(barStart, barEnd);
     
     for (auto c: m_curves) {
         if (auto model = ModelById::getAs<SparseTimeValueModel>(c.second)) {
@@ -169,6 +212,11 @@ TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
     int bar = barAndFraction[0].toInt(&ok);
     if (!ok) return 0.0;
 
+    auto sig = getTimeSignature(bar);
+
+    SVDEBUG << "labelToBarAndFraction: label = " << label << ", sig = "
+            << sig.first << "/" << sig.second << endl;
+    
     QStringList numAndDenom = barAndFraction[1].split("/");
     if (numAndDenom.size() != 2) return 0.0;
 
@@ -178,8 +226,14 @@ TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
     int denom = numAndDenom[1].toInt(&ok);
     if (!ok) return 0.0;
 
+    double pos = double(num) / (denom > 0 ? double(denom) : 1.0);
+    double len = double(sig.first) / (sig.second > 0 ? double(sig.second) : 1.0);
+
+    double result = double(bar);
+    if (len > 0.0) result += pos / len;
+    
     ok = true;
-    return double(bar) + double(num) / double(denom);
+    return result;
 }
 
 double
@@ -192,15 +246,18 @@ TempoCurveWidget::barToX(double bar, double barStart, double barEnd) const
 }
 
 void
-TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd,
-                                       int beatsPerBar)
+TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd)
 {
     QPainter paint(this);
     paint.setRenderHint(QPainter::Antialiasing, true);
     paint.setBrush(Qt::NoBrush);
+    
+    for (int ibar = int(floor(barStart)); ibar <= int(ceil(barEnd)); ++ibar) {
 
-    for (double bar = floor(barStart); bar <= barEnd; bar += 1.0) {
-
+        auto sig = getTimeSignature(ibar);
+        
+        double bar(ibar);
+        
         double x = barToX(bar, barStart, barEnd);
         paint.setPen(Qt::black);
         paint.drawLine(x, 0, x, height());
@@ -209,8 +266,8 @@ TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd,
         paint.drawText(x + 5, 5 + paint.fontMetrics().ascent(),
                        QString("%1").arg(int(bar)));
         
-        for (int i = 1; i < beatsPerBar; ++i) {
-            double barFrac = bar + double(i) / double(beatsPerBar);
+        for (int i = 1; i < sig.first; ++i) {
+            double barFrac = bar + double(i) / double(sig.first);
             x = barToX(barFrac, barStart, barEnd);
             paint.setPen(Qt::gray);
             paint.drawLine(x, 0, x, height());
@@ -263,9 +320,10 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
         double x = barToX(bar, barStart, barEnd);
         double y = h - (h * ((p.getValue() - minValue) / (maxValue - minValue)));
 
-        SVCERR << "frame = " << p.getFrame() << ", label = " << p.getLabel() << ", bar = " << bar
-               << ", value = " << p.getValue() << ", minValue = " << minValue
-               << ", maxValue = " << maxValue << ", w = " << w << ", h = "
+        SVCERR << "frame = " << p.getFrame() << ", label = " << p.getLabel()
+               << ", bar = " << bar << ", value = " << p.getValue()
+               << ", minValue = " << minValue << ", maxValue = "
+               << maxValue << ", w = " << w << ", h = "
                << h << ", x = " << x << ", y = " << y << endl;
         
         if (!first) {

@@ -23,6 +23,8 @@
 #include "data/model/Model.h"
 #include "data/model/SparseTimeValueModel.h"
 
+#include "piano-aligner/Score.h"
+
 class TempoCurveWidget : public QFrame
 {
     Q_OBJECT
@@ -31,9 +33,11 @@ public:
     TempoCurveWidget(QWidget *parent = 0);
     virtual ~TempoCurveWidget();
 
+    void setMusicalEvents(const Score::MusicalEventList &musicalEvents);
+
     void setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoModel);
     void unsetCurveForAudio(sv::ModelId audioModel);
-
+                                                   
 public slots:
     void setHighlightedPosition(QString label);
     void setCurrentAudioModel(sv::ModelId audioModel);
@@ -50,14 +54,16 @@ private:
     sv::ModelId m_currentAudioModel;
     sv::sv_frame_t m_audioModelDisplayBegin;
     sv::sv_frame_t m_audioModelDisplayEnd;
+    Score::MusicalEventList m_musicalEvents;
+    std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
+    std::pair<int, int> getTimeSignature(int bar) const;
 
     double barToX(double bar, double barStart, double barEnd) const;
 
     double frameToBarAndFraction(sv::sv_frame_t frame,
                                  sv::ModelId audioModel) const;
     double labelToBarAndFraction(QString label, bool *ok) const;
-    void paintBarAndBeatLines(double barStart, double barEnd,
-                              int beatsPerBar); // 0 for no beats
+    void paintBarAndBeatLines(double barStart, double barEnd);
     void paintCurve(std::shared_ptr<sv::SparseTimeValueModel> tempoCurveModel,
                     QColor colour, double barStart, double barEnd);
 };
