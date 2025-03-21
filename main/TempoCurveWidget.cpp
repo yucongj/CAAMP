@@ -157,6 +157,7 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
     
     {
         QPainter paint(this);
+        setPaintFont(paint);
         m_margin = scale.getWidth(this, paint);
         paint.fillRect(rect(), getBackground());
     }
@@ -194,10 +195,13 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
 
     {
         QPainter paint(this);
+        setPaintFont(paint);
+        paint.setPen(getForeground());
         paint.fillRect(QRectF(0.0, 0.0, m_margin, height()), getBackground());
         scale.paintVertical(this, m_coordinateScale, paint, 0);
         paint.drawText(5, height() - paint.fontMetrics().descent(),
                        QString("%1 =").arg(m_crotchet));
+        paint.drawLine(m_margin, 0, m_margin, height());
     }
 }
 
