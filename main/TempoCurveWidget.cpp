@@ -13,15 +13,26 @@
 #include "TempoCurveWidget.h"
 
 #include "svgui/layer/ColourDatabase.h"
+#include "svgui/layer/LinearNumericalScale.h"
+#include "svgui/layer/PaintAssistant.h"
 
 #include <QPainter>
 
 using namespace std;
 using namespace sv;
 
+//#define DEBUG_TEMPO_CURVE_WIDGET 1
+
 TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     QFrame(parent),
+    m_crotchet(QChar(0x2669)),
+    m_coordinateScale(CoordinateScale::Direction::Vertical,
+                      QString("%1/min").arg(m_crotchet), // unit
+                      false,                             // logarithmic
+                      40.0,
+                      200.0),
     m_colourCounter(0),
+    m_margin(0),
     m_highlightedPosition(-1.0),
     m_audioModelDisplayBegin(0),
     m_audioModelDisplayEnd(0)
@@ -53,11 +64,13 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
         m_timeSignatures[bar] = sig;
         prev = sig;
     }
-    SVDEBUG << "setMusicalEvents: time sigs:" << endl;
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::setMusicalEvents: time sigs:" << endl;
     for (int i = 0; i < m_timeSignatures.size(); ++i) {
         SVDEBUG << i << ": " << m_timeSignatures[i].first << "/"
                 << m_timeSignatures[i].second << endl;
     }
+#endif
 
     m_curves.clear();
     m_colours.clear();
@@ -101,8 +114,10 @@ TempoCurveWidget::getTimeSignature(int bar) const
 void
 TempoCurveWidget::setHighlightedPosition(QString label)
 {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
     SVDEBUG << "TempoCurveWidget::setHighlightedPosition("
             << label << ")" << endl;
+#endif
 
     bool ok = false;
     double bar = labelToBarAndFraction(label, &ok);
@@ -136,9 +151,12 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
 {
     QFrame::paintEvent(e);
 
+    LinearNumericalScale scale;
+    
     {
         QPainter paint(this);
-        paint.fillRect(rect(), Qt::white);
+        m_margin = scale.getWidth(this, paint);
+        paint.fillRect(rect(), getBackground());
     }
 
     double barStart = frameToBarAndFraction(m_audioModelDisplayBegin,
@@ -168,6 +186,14 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         paint.setPen(Qt::NoPen);
         paint.setBrush(highlightColour);
         paint.drawRect(QRectF(x, 0.0, 10.0, height()));
+    }
+
+    {
+        QPainter paint(this);
+        paint.fillRect(QRectF(0.0, 0.0, m_margin, height()), getBackground());
+        scale.paintVertical(this, m_coordinateScale, paint, 0);
+        paint.drawText(5, height() - paint.fontMetrics().descent(),
+                       QString("%1 =").arg(m_crotchet));
     }
 }
 
@@ -214,8 +240,10 @@ TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
 
     auto sig = getTimeSignature(bar);
 
-    SVDEBUG << "labelToBarAndFraction: label = " << label << ", sig = "
-            << sig.first << "/" << sig.second << endl;
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::labelToBarAndFraction: label = " << label
+            << ", sig = " << sig.first << "/" << sig.second << endl;
+#endif
     
     QStringList numAndDenom = barAndFraction[1].split("/");
     if (numAndDenom.size() != 2) return 0.0;
@@ -239,10 +267,9 @@ TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
 double
 TempoCurveWidget::barToX(double bar, double barStart, double barEnd) const
 {
-    double margin = 16.0;
-    double w = width() - margin;
+    double w = width() - m_margin;
     if (w < 0.0) w = 1.0;
-    return margin + w * ((bar - barStart) / (barEnd - barStart));
+    return m_margin + w * ((bar - barStart) / (barEnd - barStart));
 }
 
 void
@@ -259,7 +286,7 @@ TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd)
         double bar(ibar);
         
         double x = barToX(bar, barStart, barEnd);
-        paint.setPen(Qt::black);
+        paint.setPen(getForeground());
         paint.drawLine(x, 0, x, height());
 
         //!!! +font
@@ -318,13 +345,17 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
         }
 
         double x = barToX(bar, barStart, barEnd);
-        double y = h - (h * ((p.getValue() - minValue) / (maxValue - minValue)));
 
-        SVCERR << "frame = " << p.getFrame() << ", label = " << p.getLabel()
-               << ", bar = " << bar << ", value = " << p.getValue()
-               << ", minValue = " << minValue << ", maxValue = "
-               << maxValue << ", w = " << w << ", h = "
-               << h << ", x = " << x << ", y = " << y << endl;
+        double y = m_coordinateScale.getCoordForValue(this, p.getValue());
+
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+        SVDEBUG << "TempoCurveWidget::paintCurve: frame = "
+                << p.getFrame() << ", label = " << p.getLabel()
+                << ", bar = " << bar << ", value = " << p.getValue()
+                << ", minValue = " << minValue << ", maxValue = "
+                << maxValue << ", w = " << w << ", h = "
+                << h << ", x = " << x << ", y = " << y << endl;
+#endif
         
         if (!first) {
             paint.setPen(linePen);

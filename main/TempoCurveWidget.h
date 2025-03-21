@@ -23,20 +23,29 @@
 #include "data/model/Model.h"
 #include "data/model/SparseTimeValueModel.h"
 
+#include "layer/LayerGeometryProvider.h"
+#include "layer/CoordinateScale.h"
+
 #include "piano-aligner/Score.h"
 
-class TempoCurveWidget : public QFrame
+class TempoCurveWidget : public QFrame, public sv::LayerDimensionProvider
 {
     Q_OBJECT
 
 public:
     TempoCurveWidget(QWidget *parent = 0);
     virtual ~TempoCurveWidget();
-
+    
     void setMusicalEvents(const Score::MusicalEventList &musicalEvents);
 
     void setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoModel);
     void unsetCurveForAudio(sv::ModelId audioModel);
+
+    // LayerDimensionProvider methods
+    QRect getPaintRect() const override { return rect(); }
+    bool hasLightBackground() const override { return true; }
+    QColor getForeground() const override { return Qt::black; }
+    QColor getBackground() const override { return Qt::white; }
                                                    
 public slots:
     void setHighlightedPosition(QString label);
@@ -49,7 +58,10 @@ protected:
 private:
     std::map<sv::ModelId, sv::ModelId> m_curves; // audio model -> tempo model
     std::map<sv::ModelId, QColor> m_colours; // audio model -> colour
+    QString m_crotchet;
+    sv::CoordinateScale m_coordinateScale;
     int m_colourCounter;
+    int m_margin;
     double m_highlightedPosition;
     sv::ModelId m_currentAudioModel;
     sv::sv_frame_t m_audioModelDisplayBegin;
