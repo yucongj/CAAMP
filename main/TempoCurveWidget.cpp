@@ -15,6 +15,8 @@
 #include "svgui/layer/ColourDatabase.h"
 #include "svgui/layer/LinearNumericalScale.h"
 #include "svgui/layer/PaintAssistant.h"
+#include "svgui/widgets/TextAbbrev.h"
+#include "svcore/base/Preferences.h"
 
 #include <QPainter>
 
@@ -178,6 +180,8 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         }
     }
 
+    paintLabels();
+
     if (m_highlightedPosition >= 0.0) {
         double x = barToX(m_highlightedPosition, barStart, barEnd);
         QPainter paint(this);
@@ -276,6 +280,7 @@ void
 TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd)
 {
     QPainter paint(this);
+    setPaintFont(paint);
     paint.setRenderHint(QPainter::Antialiasing, true);
     paint.setBrush(Qt::NoBrush);
     
@@ -312,9 +317,6 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
      
     EventVector points(model->getAllEvents()); //!!! for now...
 
-    double w = width();
-    double h = height();
-
     double maxValue = model->getValueMaximum();
     double minValue = model->getValueMinimum();
     if (maxValue <= minValue) maxValue = minValue + 1.0;
@@ -336,7 +338,6 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
             SVDEBUG << "TempoCurveWidget::paintCurve: Failed to parse bar and fraction \"" << p.getLabel() << "\"" << endl;
             continue;
         }
-        // For now we show an arbitrary fixed bar range 0-5
         if (bar < barStart) {
             continue;
         }
@@ -372,5 +373,87 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
 
 }
 
+void
+TempoCurveWidget::paintLabels()
+{
+    // Partly borrowed from Pane::drawLayerNames
+    
+    QPainter paint(this);
+    setPaintFont(paint);
+    paint.setPen(getForeground());
+    
+    auto fontHeight = paint.fontMetrics().height();
+    auto fontAscent = paint.fontMetrics().ascent();
+    
+    QStringList texts;
+    vector<QPixmap> pixmaps;
+    
+    for (auto c: m_colours) {
+        if (auto model = ModelById::get(c.first)) {
+            QColor colour = c.second;
+            QString label = model->objectName();
+            QPixmap pixmap = ColourDatabase::getInstance()->
+                getExamplePixmap(colour, QSize(fontAscent, fontAscent), false);
+            texts.push_back(label);
+            pixmaps.push_back(pixmap);
+        }
+    }
 
+    int maxTextWidth = width() / 3;
+    texts = TextAbbrev::abbreviate(texts, paint.fontMetrics(), maxTextWidth,
+                                   TextAbbrev::ElideEndAndCommonPrefixes);
 
+    int llx = width() - maxTextWidth - 5;
+    int lly = height() - 6;
+    
+    for (int i = 0; i < texts.size(); ++i) {
+
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+        SVDEBUG << "TempoCurveWidget::paintLabels: text " << i << " = \""
+                << texts[i] << "\", llx = " << llx << ", lly = " << lly
+                << endl;
+#endif
+        
+        PaintAssistant::drawVisibleText(this, paint, llx,
+                                        lly - fontHeight + fontAscent,
+                                        texts[i],
+                                        PaintAssistant::OutlinedText);
+
+        paint.drawPixmap(llx - fontAscent - 3,
+                         lly - fontHeight + (fontHeight-fontAscent)/2,
+                         pixmaps[i]);
+            
+        lly -= fontHeight;
+    }
+}
+
+void
+TempoCurveWidget::setPaintFont(QPainter &paint)
+{
+    // From View::setPaintFont
+    
+    int scaleFactor = 1;
+    int dpratio = int(ceil(devicePixelRatioF()));
+    if (dpratio > 1) {
+        QPaintDevice *dev = paint.device();
+        if (dynamic_cast<QPixmap *>(dev) || dynamic_cast<QImage *>(dev)) {
+            scaleFactor = dpratio;
+        }
+    }
+
+    QFont font(paint.font());
+    int pointSize = Preferences::getInstance()->getViewFontSize() * scaleFactor;
+    font.setPointSize(pointSize);
+
+    int h = height();
+    int fh = QFontMetrics(font).height();
+    if (pointSize > 6) {
+        if (h < fh * 2.1) {
+            font.setPointSize(pointSize - 2);
+        } else if (h < fh * 3.1) {
+            font.setPointSize(pointSize - 1);
+        }
+    }
+    
+    paint.setFont(font);
+}

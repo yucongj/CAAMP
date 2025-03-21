@@ -78,6 +78,9 @@ private:
     void paintBarAndBeatLines(double barStart, double barEnd);
     void paintCurve(std::shared_ptr<sv::SparseTimeValueModel> tempoCurveModel,
                     QColor colour, double barStart, double barEnd);
+    void paintLabels();
+
+    void setPaintFont(QPainter &paint);
 };
 
 #endif
