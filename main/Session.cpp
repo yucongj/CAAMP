@@ -344,8 +344,8 @@ Session::addFurtherAudioPane(Pane *audioPane)
         return;
     }
 
-    // This pane should already have a waveform, so we move that to
-    // the feature pane.
+    // This pane should already have a waveform; we put the
+    // spectrogram on top
 
     WaveformLayer *waveformLayer = nullptr;
     WaveformLayer *overviewLayer = nullptr;
@@ -358,9 +358,6 @@ Session::addFurtherAudioPane(Pane *audioPane)
     }
     
     if (waveformLayer) {
-
-        m_document->removeLayerFromView(audioPane, waveformLayer);
-
         if (m_overview) {
             overviewLayer = qobject_cast<WaveformLayer *>
                 (m_document->createLayer(LayerFactory::Waveform));
