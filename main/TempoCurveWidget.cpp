@@ -82,6 +82,7 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
 
     m_curves.clear();
     m_colours.clear();
+    m_colourCounter = 0;
 
     updateBarDisplayExtentsFromAudio();
 }
@@ -97,15 +98,18 @@ TempoCurveWidget::setCurveForAudio(sv::ModelId audioModel,
     
     m_curves[audioModel] = tempoModel;
 
-    ColourDatabase *cdb = ColourDatabase::getInstance();
-    QColor colour = Qt::black;
-
-    while (colour == Qt::black || colour == Qt::white) {
-        colour = cdb->getColour(m_colourCounter % cdb->getColourCount());
-        ++m_colourCounter;
-    }
+    if (m_colours.find(audioModel) == m_colours.end()) {
     
-    m_colours[audioModel] = colour;
+        ColourDatabase *cdb = ColourDatabase::getInstance();
+        QColor colour = Qt::black;
+
+        while (colour == Qt::black || colour == Qt::white) {
+            colour = cdb->getColour(m_colourCounter % cdb->getColourCount());
+            ++m_colourCounter;
+        }
+    
+        m_colours[audioModel] = colour;
+    }
 
     updateBarDisplayExtentsFromAudio();
 }
@@ -119,7 +123,6 @@ TempoCurveWidget::unsetCurveForAudio(sv::ModelId audioModel)
 #endif
 
     m_curves.erase(audioModel);
-    m_colours.erase(audioModel);
 
     updateBarDisplayExtentsFromAudio();
 }
@@ -491,7 +494,7 @@ TempoCurveWidget::paintLabels()
                                    TextAbbrev::ElideEndAndCommonPrefixes);
 
     int llx = width() - maxTextWidth - 5;
-    int lly = height() - 6;
+    int lly = height() - 6 - fontHeight * texts.size();
     
     for (int i = 0; i < texts.size(); ++i) {
 
@@ -510,7 +513,7 @@ TempoCurveWidget::paintLabels()
                          lly - fontHeight + (fontHeight-fontAscent)/2,
                          pixmaps[i]);
             
-        lly -= fontHeight;
+        lly += fontHeight;
     }
 }
 

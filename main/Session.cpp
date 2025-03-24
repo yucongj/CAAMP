@@ -225,6 +225,10 @@ Session::paneRemoved(Pane *pane)
             m_document->removeLayerFromView(view, layer);
         }
     }
+
+    if (m_tempoCurveWidget) {
+        m_tempoCurveWidget->unsetCurveForAudio(modelToBeDeleted);
+    }
     
     if (newMainModel == modelToBeDeleted) {
         newMainModel = {};
