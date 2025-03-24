@@ -73,7 +73,6 @@ public:
 public slots:
     void setDocument(sv::Document *,
                      sv::Pane *topAudioPane,
-                     sv::Pane *featurePane, // optional
                      TempoCurveWidget *tempoCurveWidget,
                      sv::View *overview,
                      sv::Layer *timeRuler);
@@ -136,7 +135,6 @@ private:
     sv::TransformId m_alignmentTransformId;
 
     std::vector<sv::Pane *> m_audioPanes;
-    sv::Pane *m_featurePane;
     TempoCurveWidget *m_tempoCurveWidget;
     sv::View *m_overview;
     sv::Pane *m_activePane; // an alias for one of the panes, or null
@@ -153,7 +151,6 @@ private:
 
     struct FeatureData {
         std::vector<AlignmentEntry> alignmentEntries;
-//        sv::TimeValueLayer *tempoLayer;
         sv::ModelId tempoModel;
         sv::WaveformLayer *overviewLayer;
         QString lastExportedTo;

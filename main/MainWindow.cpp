@@ -4733,19 +4733,12 @@ MainWindow::documentReplaced()
     m_document->setAutoAlignment(true); // for audio-to-audio alignment
     
     Pane *topPane = m_paneStack->addPane();
-    Pane *bottomPane = m_paneStack->addPane();
-
     topPane->setSelectionSnapToFeatures(false);
-    bottomPane->setSelectionSnapToFeatures(false);
     
     connect(topPane, SIGNAL(contextHelpChanged(const QString &)),
             this, SLOT(contextHelpChanged(const QString &)));
 
-    connect(bottomPane, SIGNAL(contextHelpChanged(const QString &)),
-            this, SLOT(contextHelpChanged(const QString &)));
-
     m_overview->registerView(topPane);
-    m_overview->registerView(bottomPane);
 
     if (!m_timeRulerLayer) {
         m_timeRulerLayer = m_document->createMainModelLayer
@@ -4756,8 +4749,8 @@ MainWindow::documentReplaced()
 
     SVDEBUG << "MainWindow::documentReplaced: Added views, now calling m_session.setDocument" << endl;
     
-    m_session.setDocument(m_document, topPane, bottomPane,
-                          m_tempoCurveWidget, m_overview, m_timeRulerLayer);
+    m_session.setDocument(m_document, topPane, m_tempoCurveWidget,
+                          m_overview, m_timeRulerLayer);
 
     CommandHistory::getInstance()->clear();
     CommandHistory::getInstance()->documentSaved();

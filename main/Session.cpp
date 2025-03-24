@@ -40,7 +40,7 @@ Session::Session() :
     m_pendingOnsetsLayer(nullptr)
 {
     SVDEBUG << "Session::Session" << endl;
-    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 Session::~Session()
@@ -53,7 +53,6 @@ Session::~Session()
 void
 Session::setDocument(Document *doc,
                      Pane *mainAudioPane,
-                     Pane *featurePane,
                      TempoCurveWidget *tempoCurveWidget,
                      View *overview,
                      Layer *timeRuler)
@@ -75,7 +74,6 @@ Session::setDocument(Document *doc,
     if (mainAudioPane) {
         m_audioPanes.push_back(mainAudioPane);
     }
-    m_featurePane = featurePane;
     m_tempoCurveWidget = tempoCurveWidget;
     m_overview = overview;
     m_activePane = mainAudioPane;
@@ -97,18 +95,12 @@ Session::setDocument(Document *doc,
         connect(mainAudioPane, &View::zoomLevelChanged,
                 this, &Session::paneCentreOrZoomChanged);
     }
-    if (featurePane) {
-        connect(featurePane, &View::centreFrameChanged,
-                this, &Session::paneCentreOrZoomChanged);
-        connect(featurePane, &View::zoomLevelChanged,
-                this, &Session::paneCentreOrZoomChanged);
-    }
 }
 
 void
 Session::unsetDocument()
 {
-    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    setDocument(nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
 TimeInstantLayer *
@@ -129,23 +121,7 @@ Session::getReferencePane() const
 {
     return getAudioPaneForAudioModel(m_mainModel);
 }
-/*!!!
-TimeValueLayer *
-Session::getTempoLayerForAudioModel(ModelId model)
-{
-    if (m_featureData.find(model) != m_featureData.end()) {
-        return m_featureData.at(model).tempoLayer;
-    } else {
-        return nullptr;
-    }
-}
 
-Pane *
-Session::getPaneContainingTempoLayers()
-{
-    return m_featurePane;
-}
-*/
 void
 Session::setMainModel(ModelId modelId)
 {
@@ -168,8 +144,8 @@ Session::setMainModel(ModelId modelId)
     } else if (m_mainModel.isNone()) {
         SVDEBUG << "Session::setMainModel: WARNING: Cleared main model, but there is a document active" << endl;
         return;
-    } else if (m_audioPanes.empty() || !m_featurePane || !m_tempoCurveWidget) {
-        SVDEBUG << "Session::setMainModel: WARNING: Set a main model but we lack one or more of: audio panes, feature pane, tempo curve widget" << endl;
+    } else if (m_audioPanes.empty()) {
+        SVDEBUG << "Session::setMainModel: WARNING: Set a main model but we lack any audio panes" << endl;
         return;
     }
 
@@ -188,17 +164,6 @@ Session::setMainModel(ModelId modelId)
         m_document->setModel(overviewLayer, m_mainModel);
     }
 
-    if (m_featurePane) {
-        m_document->addLayerToView(m_featurePane, m_timeRulerLayer);
-    
-        WaveformLayer *waveformLayer = qobject_cast<WaveformLayer *>
-            (m_document->createLayer(LayerFactory::Waveform));
-        waveformLayer->setBaseColour(waveColour);
-    
-        m_document->addLayerToView(m_featurePane, waveformLayer);
-        m_document->setModel(waveformLayer, m_mainModel);
-    }
-    
     SpectrogramLayer *spectrogramLayer = qobject_cast<SpectrogramLayer *>
         (m_document->createLayer(LayerFactory::MelodicRangeSpectrogram));
     spectrogramLayer->setBinScale(BinScale::Linear);
@@ -221,12 +186,6 @@ Session::setMainModel(ModelId modelId)
 void
 Session::paneRemoved(Pane *pane)
 {
-    if (m_featurePane == pane) {
-        SVDEBUG << "Session::paneRemoved: it's the feature pane" << endl;
-        m_featurePane = nullptr;
-        return;
-    }
-    
     vector<Pane *> remainingPanes;
     ModelId modelToBeDeleted = getAudioModelFromPane(pane);
     bool isReference = (modelToBeDeleted == m_mainModel);
@@ -251,7 +210,7 @@ Session::paneRemoved(Pane *pane)
 
     m_audioPanes = remainingPanes;
 
-    vector<View *> views = { m_featurePane, m_overview };
+    vector<View *> views = { m_overview };
 
     for (auto view : views) {
         if (!view) continue;
@@ -399,8 +358,8 @@ Session::addFurtherAudioPane(Pane *audioPane)
     }
     
     if (waveformLayer) {
+
         m_document->removeLayerFromView(audioPane, waveformLayer);
-        m_document->addLayerToView(m_featurePane, waveformLayer);
 
         if (m_overview) {
             overviewLayer = qobject_cast<WaveformLayer *>
@@ -460,10 +419,6 @@ Session::setActivePane(Pane *pane)
         return;
     }
 
-    if (pane == m_featurePane) {
-        return;
-    }
-
     ModelId audioModelId = getAudioModelFromPane(pane);
     if (audioModelId.isNone()) {
         return;
@@ -472,7 +427,7 @@ Session::setActivePane(Pane *pane)
     // Select the associated waveform and tempo curves in the feature
     // pane and overview, hide the rest
 
-    vector<View *> views = { m_featurePane, m_overview };
+    vector<View *> views = { m_overview };
     
     for (auto view : views) {
         if (!view) continue;
@@ -674,16 +629,6 @@ Session::beginPartialAlignment(int scorePositionStartNumerator,
     if (onsetsLayer) {
         onsetsLayer->showLayer(activeAudioPane, false);
     }
-    /*!!!
-    if (m_featurePane) {
-        if (m_featureData.find(activeModelId) != m_featureData.end()) {
-            auto tempoLayer = m_featureData.at(activeModelId).tempoLayer;
-            if (tempoLayer) {
-                m_document->removeLayerFromView(m_featurePane, tempoLayer);
-            }
-        }
-    }
-    */
     Transform::ParameterMap params {
         { "score-position-start-numerator", scorePositionStartNumerator },
         { "score-position-start-denominator", scorePositionStartDenominator },
@@ -1371,36 +1316,12 @@ Session::recalculateTempoCurveFor(ModelId audioModel)
     }
     
     m_featureData.at(audioModel).alignmentModified = true;
-/*!!!
-    if (!m_featureData.at(audioModel).tempoLayer) {
-        tempoLayer = qobject_cast<TimeValueLayer *>
-            (m_document->createLayer(LayerFactory::TimeValues));
-        ColourDatabase *cdb = ColourDatabase::getInstance();
-        tempoLayer->setBaseColour(cdb->getColourIndex(tr("Blue")));
-        m_featureData[audioModel].tempoLayer = tempoLayer;
-    } else {
-        tempoLayer = m_featureData.at(audioModel).tempoLayer;
-    }
 
-    if (m_featurePane) {
-        bool inFeaturePane = false;
-        for (int i = 0; i < m_featurePane->getLayerCount(); ++i) {
-            if (m_featurePane->getLayer(i) == tempoLayer) {
-                inFeaturePane = true;
-                break;
-            }
-        }
-        if (!inFeaturePane) {
-            m_document->addLayerToView(m_featurePane, tempoLayer);
-        }
-    }
-*/        
     sv_samplerate_t sampleRate = ModelById::get(audioModel)->getSampleRate();
     auto tempoModel = make_shared<SparseTimeValueModel>(sampleRate, 1);
     ModelId tempoModelId = ModelById::add(tempoModel);
     m_featureData[audioModel].tempoModel = tempoModelId;
     tempoModel->setSourceModel(audioModel);
-//    m_document->addNonDerivedModel(tempoModelId);
     
     auto audioPane = getAudioPaneForAudioModel(audioModel);
     if (!audioPane) {
@@ -1471,7 +1392,6 @@ Session::recalculateTempoCurveFor(ModelId audioModel)
     // We must do this after adding all the events, otherwise we get
     // mired in a series of very slow updates from each time an event
     // is added
-//!!!    m_document->setModel(tempoLayer, tempoModelId);
     if (m_tempoCurveWidget) {
         m_tempoCurveWidget->setCurveForAudio(audioModel, tempoModelId);
     }
