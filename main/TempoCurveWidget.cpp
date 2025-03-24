@@ -36,8 +36,10 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_colourCounter(0),
     m_margin(0),
     m_highlightedPosition(-1.0),
-    m_audioModelDisplayBegin(0),
-    m_audioModelDisplayEnd(0)
+    m_audioModelDisplayStart(0),
+    m_audioModelDisplayEnd(0),
+    m_barDisplayStart(0),
+    m_barDisplayEnd(0)
 {
 }
 
@@ -48,6 +50,10 @@ TempoCurveWidget::~TempoCurveWidget()
 void
 TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
 {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::setMusicalEvents: " << musicalEvents.size() << " events" << endl;
+#endif
+    
     m_musicalEvents = musicalEvents;
     m_timeSignatures.clear();
     pair<int, int> prev(4, 4);
@@ -76,11 +82,19 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
 
     m_curves.clear();
     m_colours.clear();
+
+    updateBarDisplayExtentsFromAudio();
 }
 
 void
-TempoCurveWidget::setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoModel)
+TempoCurveWidget::setCurveForAudio(sv::ModelId audioModel,
+                                   sv::ModelId tempoModel)
 {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::setCurveForAudio(" << audioModel << ", "
+            << tempoModel << ")" << endl;
+#endif
+    
     m_curves[audioModel] = tempoModel;
 
     ColourDatabase *cdb = ColourDatabase::getInstance();
@@ -92,13 +106,22 @@ TempoCurveWidget::setCurveForAudio(sv::ModelId audioModel, sv::ModelId tempoMode
     }
     
     m_colours[audioModel] = colour;
+
+    updateBarDisplayExtentsFromAudio();
 }
 
 void
 TempoCurveWidget::unsetCurveForAudio(sv::ModelId audioModel)
 {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::unsetCurveForAudio(" << audioModel
+            << ")" << endl;
+#endif
+
     m_curves.erase(audioModel);
     m_colours.erase(audioModel);
+
+    updateBarDisplayExtentsFromAudio();
 }
 
 pair<int, int>
@@ -130,27 +153,87 @@ TempoCurveWidget::setHighlightedPosition(QString label)
     }
 
     m_highlightedPosition = bar;
+    ensureBarVisible(bar);
     update();
 }
 
 void
 TempoCurveWidget::setCurrentAudioModel(ModelId model)
 {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::setCurrentAudioModel(" << model
+            << ")" << endl;
+#endif
+
     m_currentAudioModel = model;
+
+    updateBarDisplayExtentsFromAudio();
+}
+
+void
+TempoCurveWidget::setAudioModelDisplayedRange(sv_frame_t start, sv_frame_t end)
+{
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::setAudioModelDisplayedRange(" << start
+            << ", " << end << ") [m_currentAudioModel = " << m_currentAudioModel
+            << "]" << endl;
+#endif
+
+    m_audioModelDisplayStart = start;
+    m_audioModelDisplayEnd = end;
+
+    updateBarDisplayExtentsFromAudio();
+}
+
+void
+TempoCurveWidget::updateBarDisplayExtentsFromAudio()
+{
+    m_barDisplayStart = frameToBarAndFraction(m_audioModelDisplayStart,
+                                              m_currentAudioModel);
+    m_barDisplayEnd = frameToBarAndFraction(m_audioModelDisplayEnd,
+                                            m_currentAudioModel);
+
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::updateBarDisplayExtentsFromAudio: "
+            << "m_barDisplayStart = " << m_barDisplayStart
+            << ", m_barDisplayEnd = " << m_barDisplayEnd << endl;
+#endif
+
     update();
 }
 
 void
-TempoCurveWidget::setAudioModelDisplayedRange(sv_frame_t begin, sv_frame_t end)
+TempoCurveWidget::ensureBarVisible(double bar)
 {
-    m_audioModelDisplayBegin = begin;
-    m_audioModelDisplayEnd = end;
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::ensureBarVisible(" << bar << ")" << endl;
+#endif
+
+    if (bar >= m_barDisplayStart && bar < m_barDisplayEnd) {
+        if (barToX(bar, m_barDisplayStart, m_barDisplayEnd) < width() * 0.9) {
+            return;
+        }
+    }
+    double duration = m_barDisplayEnd - m_barDisplayStart;
+    if (duration < 2.0) duration = 2.0;
+    double proposedStart = floor(bar - 1.0);
+    double proposedEnd = proposedStart + duration;
+    if (barToX(bar, proposedStart, proposedEnd) > width() / 2) {
+        proposedStart = bar;
+        proposedEnd = proposedStart + duration;
+    }
+    m_barDisplayStart = proposedStart;
+    m_barDisplayEnd = proposedEnd;
     update();
 }
 
 void
 TempoCurveWidget::paintEvent(QPaintEvent *e)
 {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::paintEvent" << endl;
+#endif
+    
     QFrame::paintEvent(e);
 
     LinearNumericalScale scale;
@@ -162,11 +245,12 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         paint.fillRect(rect(), getBackground());
     }
 
-    double barStart = frameToBarAndFraction(m_audioModelDisplayBegin,
-                                            m_currentAudioModel);
-    double barEnd = frameToBarAndFraction(m_audioModelDisplayEnd,
-                                          m_currentAudioModel);
+    double barStart = m_barDisplayStart;
+    double barEnd = m_barDisplayEnd;
     if (barEnd <= 1.0) {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+        SVDEBUG << "TempoCurveWidget::paintEvent: barEnd = " << barEnd << ", returning early" << endl;
+#endif
         return;
     }
     if (barStart < 1.0) {
@@ -358,8 +442,7 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
                 << p.getFrame() << ", label = " << p.getLabel()
                 << ", bar = " << bar << ", value = " << p.getValue()
                 << ", minValue = " << minValue << ", maxValue = "
-                << maxValue << ", w = " << w << ", h = "
-                << h << ", x = " << x << ", y = " << y << endl;
+                << maxValue << ", x = " << x << ", y = " << y << endl;
 #endif
         
         if (!first) {

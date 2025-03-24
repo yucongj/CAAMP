@@ -50,7 +50,7 @@ public:
 public slots:
     void setHighlightedPosition(QString label);
     void setCurrentAudioModel(sv::ModelId audioModel);
-    void setAudioModelDisplayedRange(sv::sv_frame_t begin, sv::sv_frame_t end);
+    void setAudioModelDisplayedRange(sv::sv_frame_t start, sv::sv_frame_t end);
     
 protected:
     void paintEvent(QPaintEvent *e) override;
@@ -64,13 +64,18 @@ private:
     int m_margin;
     double m_highlightedPosition;
     sv::ModelId m_currentAudioModel;
-    sv::sv_frame_t m_audioModelDisplayBegin;
+    sv::sv_frame_t m_audioModelDisplayStart;
     sv::sv_frame_t m_audioModelDisplayEnd;
+    double m_barDisplayStart;
+    double m_barDisplayEnd;
     Score::MusicalEventList m_musicalEvents;
     std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
     std::pair<int, int> getTimeSignature(int bar) const;
 
     double barToX(double bar, double barStart, double barEnd) const;
+
+    void updateBarDisplayExtentsFromAudio();
+    void ensureBarVisible(double bar);
 
     double frameToBarAndFraction(sv::sv_frame_t frame,
                                  sv::ModelId audioModel) const;
