@@ -69,6 +69,7 @@ private:
     double m_barDisplayStart;
     double m_barDisplayEnd;
     Score::MusicalEventList m_musicalEvents;
+    int m_firstBar;
     std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
     std::pair<int, int> getTimeSignature(int bar) const;
 

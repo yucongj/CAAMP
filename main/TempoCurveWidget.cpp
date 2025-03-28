@@ -23,7 +23,7 @@
 using namespace std;
 using namespace sv;
 
-//#define DEBUG_TEMPO_CURVE_WIDGET 1
+#define DEBUG_TEMPO_CURVE_WIDGET 1
 
 TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     QFrame(parent),
@@ -39,7 +39,8 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_audioModelDisplayStart(0),
     m_audioModelDisplayEnd(0),
     m_barDisplayStart(0),
-    m_barDisplayEnd(0)
+    m_barDisplayEnd(0),
+    m_firstBar(1)
 {
 }
 
@@ -57,18 +58,19 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
     m_musicalEvents = musicalEvents;
     m_timeSignatures.clear();
     pair<int, int> prev(4, 4);
-    int nbars = 0;
+    // We aim for m_timeSignatures[bar] to record the time sig for
+    // that bar number. Bar numbers usually start at 1 (in which case
+    // the first entry in the vector is unused) but start at 0 if
+    // there is a pick-up bar.
     for (const auto &e : m_musicalEvents) {
         int bar = e.measureInfo.measureNumber;
-        pair<int, int> sig(e.meterNumer, e.meterDenom);
-        // we want m_timeSignatures[bar] to be correct for bar, but
-        // m_timeSignatures is zero-indexed and bar is not, so we need
-        // one more than we might think - hence <= rather than < in
-        // the following
-        while (nbars <= bar) {
-            m_timeSignatures.push_back(prev);
-            ++nbars;
+        if (m_timeSignatures.empty()) {
+            m_firstBar = bar;
         }
+        while (int(m_timeSignatures.size()) <= bar) {
+            m_timeSignatures.push_back(prev);
+        }
+        pair<int, int> sig(e.meterNumer, e.meterDenom);
         m_timeSignatures[bar] = sig;
         prev = sig;
     }
@@ -256,8 +258,8 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
 #endif
         return;
     }
-    if (barStart < 1.0) {
-        barStart = 1.0;
+    if (barStart < m_firstBar) {
+        barStart = m_firstBar;
     }
     
     paintBarAndBeatLines(barStart, barEnd);
