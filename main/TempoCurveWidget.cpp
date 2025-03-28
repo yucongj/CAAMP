@@ -19,6 +19,8 @@
 #include "svcore/base/Preferences.h"
 
 #include <QPainter>
+#include <QMouseEvent>
+#include <QWheelEvent>
 
 using namespace std;
 using namespace sv;
@@ -40,7 +42,11 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_audioModelDisplayEnd(0),
     m_barDisplayStart(0),
     m_barDisplayEnd(0),
-    m_firstBar(1)
+    m_firstBar(1),
+    m_lastBar(1),
+    m_clickedInRange(false),
+    m_releasing(false),
+    m_pendingWheelAngle(0)
 {
 }
 
@@ -67,6 +73,7 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
         if (m_timeSignatures.empty()) {
             m_firstBar = bar;
         }
+        m_lastBar = bar;
         while (int(m_timeSignatures.size()) <= bar) {
             m_timeSignatures.push_back(prev);
         }
@@ -193,6 +200,8 @@ TempoCurveWidget::setAudioModelDisplayedRange(sv_frame_t start, sv_frame_t end)
 void
 TempoCurveWidget::updateBarDisplayExtentsFromAudio()
 {
+    return; //!!!
+    
     m_barDisplayStart = frameToBarAndFraction(m_audioModelDisplayStart,
                                               m_currentAudioModel);
     m_barDisplayEnd = frameToBarAndFraction(m_audioModelDisplayEnd,
@@ -207,6 +216,12 @@ TempoCurveWidget::updateBarDisplayExtentsFromAudio()
     update();
 }
 
+bool
+TempoCurveWidget::isBarVisible(double bar)
+{
+    return (bar >= m_barDisplayStart && bar < m_barDisplayEnd);
+}
+
 void
 TempoCurveWidget::ensureBarVisible(double bar)
 {
@@ -214,14 +229,20 @@ TempoCurveWidget::ensureBarVisible(double bar)
     SVDEBUG << "TempoCurveWidget::ensureBarVisible(" << bar << ")" << endl;
 #endif
 
-    if (bar >= m_barDisplayStart && bar < m_barDisplayEnd) {
+    if (isBarVisible(bar)) {
         if (barToX(bar, m_barDisplayStart, m_barDisplayEnd) < width() * 0.9) {
             return;
         }
     }
+
     double duration = m_barDisplayEnd - m_barDisplayStart;
-    if (duration < 2.0) duration = 2.0;
-    double proposedStart = floor(bar - 1.0);
+    if (duration < 1.0) {
+        duration = 1.0;
+    }
+    double proposedStart = floor(bar);
+    if (bar < m_barDisplayStart) {
+        proposedStart = proposedStart - 1.0;
+    }
     double proposedEnd = proposedStart + duration;
     if (barToX(bar, proposedStart, proposedEnd) > width() / 2) {
         proposedStart = bar;
@@ -235,10 +256,6 @@ TempoCurveWidget::ensureBarVisible(double bar)
 void
 TempoCurveWidget::paintEvent(QPaintEvent *e)
 {
-#ifdef DEBUG_TEMPO_CURVE_WIDGET
-    SVDEBUG << "TempoCurveWidget::paintEvent" << endl;
-#endif
-    
     QFrame::paintEvent(e);
 
     LinearNumericalScale scale;
@@ -250,6 +267,10 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
         paint.fillRect(rect(), getBackground());
     }
 
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+    SVDEBUG << "TempoCurveWidget::paintEvent: m_barDisplayStart = " << m_barDisplayStart << ", m_barDisplayEnd = " << m_barDisplayEnd << ", m_firstBar = " << m_firstBar << ", m_lastBar = " << m_lastBar << endl;
+#endif
+
     double barStart = m_barDisplayStart;
     double barEnd = m_barDisplayEnd;
     if (barEnd <= 1.0) {
@@ -260,6 +281,9 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
     }
     if (barStart < m_firstBar) {
         barStart = m_firstBar;
+    }
+    if (barEnd > m_lastBar + 1) {
+        barEnd = m_lastBar + 1;
     }
     
     paintBarAndBeatLines(barStart, barEnd);
@@ -434,9 +458,6 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
         if (bar < barStart) {
             continue;
         }
-        if (bar > barEnd) {
-            break;
-        }
 
         double x = barToX(bar, barStart, barEnd);
 
@@ -553,3 +574,198 @@ TempoCurveWidget::setPaintFont(QPainter &paint)
     
     paint.setFont(font);
 }
+
+void
+TempoCurveWidget::mousePressEvent(QMouseEvent *e)
+{
+    if (e->buttons() & Qt::RightButton) {
+        // (context menu)
+        return;
+    }
+
+    m_clickPos = e->pos();
+    m_mousePos = m_clickPos;
+    m_clickedInRange = true;
+    m_releasing = false;
+
+    //...
+    
+}
+
+void
+TempoCurveWidget::mouseReleaseEvent(QMouseEvent *e)
+{
+    if (e && (e->buttons() & Qt::RightButton)) {
+        return;
+    }
+
+    if (m_clickedInRange) {
+        m_releasing = true;
+        mouseMoveEvent(e);
+        m_releasing = false;
+    }
+
+    m_clickedInRange = false;
+}
+
+void
+TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
+{
+    if (!e || (e->buttons() & Qt::RightButton)) {
+        return;
+    }
+
+    QPoint pos = e->pos();
+
+    if (m_clickedInRange && !m_releasing) {
+
+        // if no buttons pressed, and not called from
+        // mouseReleaseEvent, we want to reset clicked-ness (to avoid
+        // annoying continual drags when we moved the mouse outside
+        // the window after pressing button first time).
+
+        if (!(e->buttons() & Qt::LeftButton) &&
+            !(e->buttons() & Qt::MiddleButton)) {
+            m_clickedInRange = false;
+            return;
+        }
+    }
+
+
+}
+
+void
+TempoCurveWidget::mouseDoubleClickEvent(QMouseEvent *)
+{
+}
+
+void
+TempoCurveWidget::enterEvent(QEnterEvent *)
+{
+}
+
+void
+TempoCurveWidget::leaveEvent(QEvent *)
+{
+}
+
+void
+TempoCurveWidget::wheelEvent(QWheelEvent *e)
+{
+    e->accept();
+    
+    int dx = e->angleDelta().x();
+    int dy = e->angleDelta().y();
+
+    if (dx == 0 && dy == 0) {
+        return;
+    }
+
+    int d = dy;
+    bool horizontal = false;
+
+    if (abs(dx) > abs(dy)) {
+        d = dx;
+        horizontal = true;
+    }        
+
+    if (e->phase() == Qt::ScrollBegin) {
+        if (d < 0) m_pendingWheelAngle = -120;
+        else if (d > 0) m_pendingWheelAngle = 120;
+    } else if (std::abs(d) >= 120 ||
+               (d > 0 && m_pendingWheelAngle < 0) ||
+               (d < 0 && m_pendingWheelAngle > 0)) {
+        m_pendingWheelAngle = d;
+    } else {
+        m_pendingWheelAngle += d;
+    }
+
+    if (m_pendingWheelAngle > 600) {
+        m_pendingWheelAngle = 600;
+    }
+    if (m_pendingWheelAngle < -600) {
+        m_pendingWheelAngle = -600;
+    }
+
+    while (abs(m_pendingWheelAngle) >= 120) {
+        
+        int sign = (m_pendingWheelAngle < 0 ? -1 : 1);
+        
+        if (horizontal) {
+            wheelHorizontal(sign, e->modifiers());
+        } else {
+            wheelVertical(sign, e->modifiers());
+        }
+        
+        m_pendingWheelAngle -= sign * 120;
+    }
+}
+
+void
+TempoCurveWidget::wheelVertical(int sign, Qt::KeyboardModifiers mods)
+{
+    if (sign < 0) {
+        zoomIn();
+    } else {
+        zoomOut();
+    }
+}
+
+void
+TempoCurveWidget::wheelHorizontal(int sign, Qt::KeyboardModifiers mods)
+{
+}
+
+void
+TempoCurveWidget::zoomIn()
+{
+    zoom(true);
+}
+
+void
+TempoCurveWidget::zoomOut()
+{
+    zoom(false);
+}
+
+void
+TempoCurveWidget::zoom(bool in)
+{
+    double duration = m_barDisplayEnd - m_barDisplayStart;
+    if (duration < 1.0) {
+        duration = 1.0;
+    }
+    double adjusted = duration;
+    if (in) {
+        adjusted *= 1.41;
+    } else {
+        adjusted /= 1.41;
+    }
+    if (adjusted < 1.0) {
+        adjusted = 1.0;
+    }
+
+    bool highlightVisible = isBarVisible(m_highlightedPosition);
+    
+    double middle;
+    if (highlightVisible) {
+        double frac = (m_highlightedPosition - m_barDisplayStart) / duration;
+        m_barDisplayStart = m_highlightedPosition - frac * adjusted;
+        m_barDisplayEnd = m_highlightedPosition + (1.0 - frac) * adjusted;
+    } else {
+        double middle = m_barDisplayStart + (duration / 2.0);
+        m_barDisplayStart = middle - adjusted/2.0;
+        m_barDisplayEnd = middle + adjusted/2.0;
+    }
+    
+    if (m_barDisplayStart < m_firstBar) {
+        m_barDisplayStart = m_firstBar;
+    }
+
+    if (highlightVisible) {
+        ensureBarVisible(m_highlightedPosition);
+    }
+    
+    update();
+}
+

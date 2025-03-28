@@ -54,6 +54,18 @@ public slots:
     
 protected:
     void paintEvent(QPaintEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
+    void mouseReleaseEvent(QMouseEvent *e) override;
+    void mouseMoveEvent(QMouseEvent *e) override;
+    void mouseDoubleClickEvent(QMouseEvent *e) override;
+    void enterEvent(QEnterEvent *e) override;
+    void leaveEvent(QEvent *e) override;
+    void wheelEvent(QWheelEvent *e) override;
+    void wheelVertical(int sign, Qt::KeyboardModifiers);
+    void wheelHorizontal(int sign, Qt::KeyboardModifiers);
+    void zoomIn();
+    void zoomOut();
+    void zoom(bool in);
 
 private:
     std::map<sv::ModelId, sv::ModelId> m_curves; // audio model -> tempo model
@@ -70,12 +82,21 @@ private:
     double m_barDisplayEnd;
     Score::MusicalEventList m_musicalEvents;
     int m_firstBar;
+    int m_lastBar;
+
+    QPoint m_clickPos;
+    QPoint m_mousePos;
+    bool m_clickedInRange;
+    bool m_releasing;
+    int m_pendingWheelAngle;
+
     std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
     std::pair<int, int> getTimeSignature(int bar) const;
 
     double barToX(double bar, double barStart, double barEnd) const;
 
     void updateBarDisplayExtentsFromAudio();
+    bool isBarVisible(double bar);
     void ensureBarVisible(double bar);
 
     double frameToBarAndFraction(sv::sv_frame_t frame,
