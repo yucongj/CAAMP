@@ -28,6 +28,11 @@
 
 #include "piano-aligner/Score.h"
 
+namespace sv {
+class Thumbwheel;
+class NotifyingPushButton;
+}
+
 class TempoCurveWidget : public QFrame, public sv::LayerDimensionProvider
 {
     Q_OBJECT
@@ -51,6 +56,11 @@ public slots:
     void setHighlightedPosition(QString label);
     void setCurrentAudioModel(sv::ModelId audioModel);
     void setAudioModelDisplayedRange(sv::sv_frame_t start, sv::sv_frame_t end);
+    void zoomIn();
+    void zoomOut();
+    void zoom(bool in);
+    void zoomTo(double duration);
+    void horizontalThumbwheelMoved(int value);
     
 protected:
     void paintEvent(QPaintEvent *e) override;
@@ -61,11 +71,9 @@ protected:
     void enterEvent(QEnterEvent *e) override;
     void leaveEvent(QEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;
+    void resizeEvent(QResizeEvent *e) override;
     void wheelVertical(int sign, Qt::KeyboardModifiers);
     void wheelHorizontal(int sign, Qt::KeyboardModifiers);
-    void zoomIn();
-    void zoomOut();
-    void zoom(bool in);
 
 private:
     std::map<sv::ModelId, sv::ModelId> m_curves; // audio model -> tempo model
@@ -78,6 +86,7 @@ private:
     sv::ModelId m_currentAudioModel;
     sv::sv_frame_t m_audioModelDisplayStart;
     sv::sv_frame_t m_audioModelDisplayEnd;
+    int m_defaultBarCount;
     double m_barDisplayStart;
     double m_barDisplayEnd;
     Score::MusicalEventList m_musicalEvents;
@@ -90,12 +99,16 @@ private:
     bool m_releasing;
     int m_pendingWheelAngle;
 
+    QWidget *m_headsUpDisplay;
+    sv::Thumbwheel *m_hthumb;
+    sv::NotifyingPushButton *m_reset;
+    void updateHeadsUpDisplay();
+    
     std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
     std::pair<int, int> getTimeSignature(int bar) const;
 
     double barToX(double bar, double barStart, double barEnd) const;
 
-    void updateBarDisplayExtentsFromAudio();
     bool isBarVisible(double bar);
     void ensureBarVisible(double bar);
 

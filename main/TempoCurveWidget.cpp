@@ -17,10 +17,15 @@
 #include "svgui/layer/PaintAssistant.h"
 #include "svgui/widgets/TextAbbrev.h"
 #include "svcore/base/Preferences.h"
+#include "svgui/widgets/Thumbwheel.h"
+#include "svgui/widgets/NotifyingPushButton.h"
+#include "svgui/view/ViewManager.h"
+#include "svgui/widgets/IconLoader.h"
 
 #include <QPainter>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QGridLayout>
 
 using namespace std;
 using namespace sv;
@@ -38,20 +43,74 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_colourCounter(0),
     m_margin(0),
     m_highlightedPosition(-1.0),
+    m_defaultBarCount(8),
     m_audioModelDisplayStart(0),
     m_audioModelDisplayEnd(0),
     m_barDisplayStart(0),
-    m_barDisplayEnd(0),
+    m_barDisplayEnd(m_defaultBarCount),
     m_firstBar(1),
     m_lastBar(1),
     m_clickedInRange(false),
     m_releasing(false),
-    m_pendingWheelAngle(0)
+    m_pendingWheelAngle(0),
+    m_headsUpDisplay(nullptr),
+    m_hthumb(nullptr),
+    m_reset(nullptr)
 {
+    updateHeadsUpDisplay();
 }
 
 TempoCurveWidget::~TempoCurveWidget()
 {
+}
+
+void
+TempoCurveWidget::updateHeadsUpDisplay()
+{
+    if (!m_headsUpDisplay) {
+        
+        m_headsUpDisplay = new QFrame(this);
+
+        QGridLayout *layout = new QGridLayout;
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
+        m_headsUpDisplay->setLayout(layout);
+        
+        m_hthumb = new Thumbwheel(Qt::Horizontal);
+        m_hthumb->setObjectName(tr("Horizontal Zoom"));
+        m_hthumb->setCursor(Qt::ArrowCursor);
+        layout->addWidget(m_hthumb, 1, 0, 1, 2);
+        m_hthumb->setFixedWidth(ViewManager::scalePixelSize(70));
+        m_hthumb->setFixedHeight(ViewManager::scalePixelSize(16));
+        m_hthumb->setMinimumValue(1);
+        m_hthumb->setMaximumValue(100);
+        m_hthumb->setDefaultValue(100 - m_defaultBarCount);
+        m_hthumb->setSpeed(0.6f);
+        connect(m_hthumb, SIGNAL(valueChanged(int)), this, 
+                SLOT(horizontalThumbwheelMoved(int)));
+
+        m_reset = new NotifyingPushButton;
+        m_reset->setFlat(true);
+        m_reset->setCursor(Qt::ArrowCursor);
+        m_reset->setFixedHeight(ViewManager::scalePixelSize(16));
+        m_reset->setFixedWidth(ViewManager::scalePixelSize(16));
+        m_reset->setIcon(IconLoader().load("zoom-reset"));
+        m_reset->setToolTip(tr("Reset zoom to default"));
+        layout->addWidget(m_reset, 1, 2);
+        
+        layout->setColumnStretch(0, 20);
+
+        connect(m_reset, SIGNAL(clicked()), m_hthumb, SLOT(resetToDefault()));
+    }
+    
+    if (!m_headsUpDisplay->isVisible()) {
+        m_headsUpDisplay->show();
+    }
+        
+    int shift = ViewManager::scalePixelSize(86);
+    m_headsUpDisplay->setFixedHeight(m_hthumb->height());
+    m_headsUpDisplay->move(width() - shift,
+                           height() - ViewManager::scalePixelSize(16));
 }
 
 void
@@ -83,7 +142,7 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
     }
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
     SVDEBUG << "TempoCurveWidget::setMusicalEvents: time sigs:" << endl;
-    for (int i = 0; i < m_timeSignatures.size(); ++i) {
+    for (int i = 0; i < int(m_timeSignatures.size()); ++i) {
         SVDEBUG << i << ": " << m_timeSignatures[i].first << "/"
                 << m_timeSignatures[i].second << endl;
     }
@@ -93,7 +152,7 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
     m_colours.clear();
     m_colourCounter = 0;
 
-    updateBarDisplayExtentsFromAudio();
+    update();
 }
 
 void
@@ -120,7 +179,7 @@ TempoCurveWidget::setCurveForAudio(sv::ModelId audioModel,
         m_colours[audioModel] = colour;
     }
 
-    updateBarDisplayExtentsFromAudio();
+    update();
 }
 
 void
@@ -133,7 +192,7 @@ TempoCurveWidget::unsetCurveForAudio(sv::ModelId audioModel)
 
     m_curves.erase(audioModel);
 
-    updateBarDisplayExtentsFromAudio();
+    update();
 }
 
 pair<int, int>
@@ -179,7 +238,7 @@ TempoCurveWidget::setCurrentAudioModel(ModelId model)
 
     m_currentAudioModel = model;
 
-    updateBarDisplayExtentsFromAudio();
+    update();
 }
 
 void
@@ -193,25 +252,6 @@ TempoCurveWidget::setAudioModelDisplayedRange(sv_frame_t start, sv_frame_t end)
 
     m_audioModelDisplayStart = start;
     m_audioModelDisplayEnd = end;
-
-    updateBarDisplayExtentsFromAudio();
-}
-
-void
-TempoCurveWidget::updateBarDisplayExtentsFromAudio()
-{
-    return; //!!!
-    
-    m_barDisplayStart = frameToBarAndFraction(m_audioModelDisplayStart,
-                                              m_currentAudioModel);
-    m_barDisplayEnd = frameToBarAndFraction(m_audioModelDisplayEnd,
-                                            m_currentAudioModel);
-
-#ifdef DEBUG_TEMPO_CURVE_WIDGET
-    SVDEBUG << "TempoCurveWidget::updateBarDisplayExtentsFromAudio: "
-            << "m_barDisplayStart = " << m_barDisplayStart
-            << ", m_barDisplayEnd = " << m_barDisplayEnd << endl;
-#endif
 
     update();
 }
@@ -717,6 +757,12 @@ TempoCurveWidget::wheelHorizontal(int sign, Qt::KeyboardModifiers mods)
 }
 
 void
+TempoCurveWidget::resizeEvent(QResizeEvent *)
+{
+    updateHeadsUpDisplay();
+}
+
+void
 TempoCurveWidget::zoomIn()
 {
     zoom(true);
@@ -735,6 +781,7 @@ TempoCurveWidget::zoom(bool in)
     if (duration < 1.0) {
         duration = 1.0;
     }
+    
     double adjusted = duration;
     if (in) {
         adjusted *= 1.41;
@@ -745,17 +792,28 @@ TempoCurveWidget::zoom(bool in)
         adjusted = 1.0;
     }
 
+    zoomTo(adjusted);
+}
+
+void
+TempoCurveWidget::zoomTo(double duration)
+{
+    double from = m_barDisplayEnd - m_barDisplayStart;
+    if (from < 1.0) {
+        from = 1.0;
+    }
+    
     bool highlightVisible = isBarVisible(m_highlightedPosition);
     
     double middle;
     if (highlightVisible) {
-        double frac = (m_highlightedPosition - m_barDisplayStart) / duration;
-        m_barDisplayStart = m_highlightedPosition - frac * adjusted;
-        m_barDisplayEnd = m_highlightedPosition + (1.0 - frac) * adjusted;
+        double frac = (m_highlightedPosition - m_barDisplayStart) / from;
+        m_barDisplayStart = m_highlightedPosition - frac * duration;
+        m_barDisplayEnd = m_highlightedPosition + (1.0 - frac) * duration;
     } else {
-        double middle = m_barDisplayStart + (duration / 2.0);
-        m_barDisplayStart = middle - adjusted/2.0;
-        m_barDisplayEnd = middle + adjusted/2.0;
+        double middle = m_barDisplayStart + (from / 2.0);
+        m_barDisplayStart = middle - duration/2.0;
+        m_barDisplayEnd = middle + duration/2.0;
     }
     
     if (m_barDisplayStart < m_firstBar) {
@@ -768,4 +826,10 @@ TempoCurveWidget::zoom(bool in)
     
     update();
 }
+
+void
+TempoCurveWidget::horizontalThumbwheelMoved(int value)
+{
+    zoomTo(100 - value);
+}    
 
