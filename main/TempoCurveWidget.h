@@ -94,7 +94,8 @@ private:
     int m_lastBar;
 
     QPoint m_clickPos;
-    QPoint m_mousePos;
+    double m_clickBarDisplayStart;
+    double m_clickBarDisplayEnd;
     bool m_clickedInRange;
     bool m_releasing;
     int m_pendingWheelAngle;

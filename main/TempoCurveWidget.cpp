@@ -624,12 +624,10 @@ TempoCurveWidget::mousePressEvent(QMouseEvent *e)
     }
 
     m_clickPos = e->pos();
-    m_mousePos = m_clickPos;
+    m_clickBarDisplayStart = m_barDisplayStart;
+    m_clickBarDisplayEnd = m_barDisplayEnd;
     m_clickedInRange = true;
     m_releasing = false;
-
-    //...
-    
 }
 
 void
@@ -671,7 +669,22 @@ TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
         }
     }
 
+    double dist = pos.x() - m_clickPos.x();
+    double threshold = 2.0;
+    if (fabs(dist) < threshold) {
+        return;
+    }
 
+    double clickAvgBarWidth = width();
+    if (m_barDisplayEnd > m_barDisplayStart) {
+        clickAvgBarWidth /= (m_barDisplayEnd - m_barDisplayStart);
+    }
+
+    double barDist = dist / clickAvgBarWidth;
+    m_barDisplayStart = m_clickBarDisplayStart - barDist;
+    m_barDisplayEnd = m_clickBarDisplayEnd - barDist;
+    
+    update();
 }
 
 void
@@ -742,7 +755,7 @@ TempoCurveWidget::wheelEvent(QWheelEvent *e)
 }
 
 void
-TempoCurveWidget::wheelVertical(int sign, Qt::KeyboardModifiers mods)
+TempoCurveWidget::wheelVertical(int sign, Qt::KeyboardModifiers)
 {
     if (sign < 0) {
         zoomIn();
@@ -752,7 +765,7 @@ TempoCurveWidget::wheelVertical(int sign, Qt::KeyboardModifiers mods)
 }
 
 void
-TempoCurveWidget::wheelHorizontal(int sign, Qt::KeyboardModifiers mods)
+TempoCurveWidget::wheelHorizontal(int sign, Qt::KeyboardModifiers)
 {
 }
 
