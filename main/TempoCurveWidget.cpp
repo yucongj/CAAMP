@@ -479,9 +479,13 @@ TempoCurveWidget::paintLabels()
     vector<QPixmap> pixmaps;
     
     for (auto c: m_colours) {
-        if (auto model = ModelById::get(c.first)) {
+        auto audioModelId = c.first;
+        if (m_curves.find(audioModelId) == m_curves.end()) {
+            continue;
+        }
+        if (auto audioModel = ModelById::get(audioModelId)) {
             QColor colour = c.second;
-            QString label = model->objectName();
+            QString label = audioModel->objectName();
             QPixmap pixmap = ColourDatabase::getInstance()->
                 getExamplePixmap(colour, QSize(fontAscent, fontAscent), false);
             texts.push_back(label);
