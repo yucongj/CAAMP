@@ -51,7 +51,10 @@ public:
     bool hasLightBackground() const override { return true; }
     QColor getForeground() const override { return Qt::black; }
     QColor getBackground() const override { return Qt::white; }
-                                                   
+
+signals:
+    void changeCurrentAudioModel(sv::ModelId toAudioModel);
+
 public slots:
     void setHighlightedPosition(QString label);
     void setCurrentAudioModel(sv::ModelId audioModel);
@@ -97,6 +100,7 @@ private:
     double m_clickBarDisplayStart;
     double m_clickBarDisplayEnd;
     bool m_clickedInRange;
+    bool m_dragging;
     bool m_releasing;
     int m_pendingWheelAngle;
 
@@ -104,11 +108,15 @@ private:
     sv::Thumbwheel *m_hthumb;
     sv::NotifyingPushButton *m_reset;
     void updateHeadsUpDisplay();
+
+    void mouseClickedOnly(QMouseEvent *);
+    bool checkCloseTo(double x, double y, sv::ModelId tempoModel);
     
     std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
     std::pair<int, int> getTimeSignature(int bar) const;
 
     double barToX(double bar, double barStart, double barEnd) const;
+    double xToBar(double x, double barStart, double barEnd) const;
 
     bool isBarVisible(double bar);
     void ensureBarVisible(double bar);

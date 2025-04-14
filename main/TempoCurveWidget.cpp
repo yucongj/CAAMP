@@ -43,14 +43,15 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_colourCounter(0),
     m_margin(0),
     m_highlightedPosition(-1.0),
-    m_defaultBarCount(8),
     m_audioModelDisplayStart(0),
     m_audioModelDisplayEnd(0),
+    m_defaultBarCount(8),
     m_barDisplayStart(0),
     m_barDisplayEnd(m_defaultBarCount),
     m_firstBar(1),
     m_lastBar(1),
     m_clickedInRange(false),
+    m_dragging(false),
     m_releasing(false),
     m_pendingWheelAngle(0),
     m_headsUpDisplay(nullptr),
@@ -429,8 +430,16 @@ double
 TempoCurveWidget::barToX(double bar, double barStart, double barEnd) const
 {
     double w = width() - m_margin;
-    if (w < 0.0) w = 1.0;
+    if (w <= 0.0) w = 1.0;
     return m_margin + w * ((bar - barStart) / (barEnd - barStart));
+}
+
+double
+TempoCurveWidget::xToBar(double x, double barStart, double barEnd) const
+{
+    double w = width() - m_margin;
+    if (w <= 0.0) w = 1.0;
+    return barStart + ((x - m_margin) / w) * (barEnd - barStart);
 }
 
 void
@@ -627,6 +636,7 @@ TempoCurveWidget::mousePressEvent(QMouseEvent *e)
     m_clickBarDisplayStart = m_barDisplayStart;
     m_clickBarDisplayEnd = m_barDisplayEnd;
     m_clickedInRange = true;
+    m_dragging = false;
     m_releasing = false;
 }
 
@@ -641,8 +651,13 @@ TempoCurveWidget::mouseReleaseEvent(QMouseEvent *e)
         m_releasing = true;
         mouseMoveEvent(e);
         m_releasing = false;
+
+        if (!m_dragging) {
+            mouseClickedOnly(e);
+        }
     }
 
+    m_dragging = false;
     m_clickedInRange = false;
 }
 
@@ -675,6 +690,8 @@ TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
         return;
     }
 
+    m_dragging = true;
+    
     double clickAvgBarWidth = width();
     if (m_barDisplayEnd > m_barDisplayStart) {
         clickAvgBarWidth /= (m_barDisplayEnd - m_barDisplayStart);
@@ -685,6 +702,62 @@ TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
     m_barDisplayEnd = m_clickBarDisplayEnd - barDist;
     
     update();
+}
+
+void
+TempoCurveWidget::mouseClickedOnly(QMouseEvent *e)
+{
+/*
+  if (m_curves.find(m_currentAudioModel) != m_curves.end()) {
+        if (checkCloseTo(e->pos().x(), e->pos().y(),
+                         m_curves.at(m_currentAudioModel))) {
+            return;
+        }
+    }
+*/  
+    for (auto c : m_curves) {
+        if (c.first != m_currentAudioModel &&
+            checkCloseTo(e->pos().x(), e->pos().y(), c.second)) {
+            SVDEBUG << "TempoCurveWidget::mouseClickedOnly: asking to change to model " << c.first << endl;
+            emit changeCurrentAudioModel(c.first);
+        }
+    }
+}
+
+bool
+TempoCurveWidget::checkCloseTo(double x, double y, ModelId tempoModel)
+{
+    auto model = ModelById::getAs<SparseTimeValueModel>(tempoModel);
+    if (!model) return false;
+
+    EventVector points(model->getAllEvents()); //!!! for now...
+
+    double threshold = ViewManager::scalePixelSize(10); 
+        
+    for (auto p : points) {
+        
+        bool ok = false;
+        double bar = labelToBarAndFraction(p.getLabel(), &ok);
+        if (!ok) continue;
+
+        double px = barToX(bar, m_barDisplayStart, m_barDisplayEnd);
+
+        if (px < 0) {
+            continue;
+        }
+        
+        double py = m_coordinateScale.getCoordForValue(this, p.getValue());
+
+        if (fabs(px - x) < threshold && fabs(py - y) < threshold) {
+            return true;
+        }
+
+        if (px > x) {
+            break;
+        }
+    }
+
+    return false;
 }
 
 void

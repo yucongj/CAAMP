@@ -566,6 +566,8 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_tempoCurveWidget = new TempoCurveWidget(frame);
     int tempoCurveHeight = m_viewManager->scalePixelSize(130);
     m_tempoCurveWidget->setFixedHeight(tempoCurveHeight); //!!! tbd
+    connect(m_tempoCurveWidget, &TempoCurveWidget::changeCurrentAudioModel,
+            this, &MainWindow::tempoCurveRequestedAudioModelChange);
     
     m_overview = new Overview(frame);
     m_overview->setViewManager(m_viewManager);
@@ -5948,6 +5950,24 @@ void
 MainWindow::restoreNormalPlayback()
 {
     m_playSpeed->setValue(m_playSpeed->defaultValue());
+}
+
+void
+MainWindow::tempoCurveRequestedAudioModelChange(ModelId audioModel)
+{
+    for (int i = 0; i < m_paneStack->getPaneCount(); ++i) {
+        Pane *pane = m_paneStack->getPane(i);
+        if (!pane) continue;
+        for (int j = 0; j < pane->getLayerCount(); ++j) {
+            Layer *layer = pane->getLayer(j);
+            if (!layer) continue;
+            if (dynamic_cast<SpectrogramLayer *>(layer) &&
+                layer->getModel() == audioModel) {
+                m_paneStack->setCurrentPane(pane);
+                return;
+            }
+        }
+    }
 }
 
 void

@@ -172,6 +172,7 @@ protected slots:
     void scorePageDownButtonClicked();
     void scorePageUpButtonClicked();
     void alignButtonClicked();
+    void tempoCurveRequestedAudioModelChange(sv::ModelId audioModel);
 
     virtual void playSpeedChanged(int);
     void playSoloToggled() override;
