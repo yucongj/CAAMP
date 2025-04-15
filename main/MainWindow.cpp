@@ -140,6 +140,7 @@
 #include <QActionGroup>
 #include <QFileDialog>
 #include <QDockWidget>
+#include <QSplitter>
 
 #include <iostream>
 #include <cstdio>
@@ -564,8 +565,6 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_mainScroll->setWidget(m_paneStack);
 
     m_tempoCurveWidget = new TempoCurveWidget(frame);
-    int tempoCurveHeight = m_viewManager->scalePixelSize(130);
-    m_tempoCurveWidget->setFixedHeight(tempoCurveHeight); //!!! tbd
     connect(m_tempoCurveWidget, &TempoCurveWidget::changeCurrentAudioModel,
             this, &MainWindow::tempoCurveRequestedAudioModelChange);
     
@@ -612,11 +611,16 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
 
     layout->setSpacing(m_viewManager->scalePixelSize(4));
 
-    layout->addWidget(m_mainScroll, 0, 0, 1, 3);
-    layout->addWidget(m_tempoCurveWidget, 1, 0, 1, 3);
-    layout->addWidget(m_overview, 2, 0);
-    layout->addWidget(m_playSpeed, 2, 1);
-    layout->addWidget(m_mainLevelPan, 2, 2);
+    m_tempoCurveSplitter = new QSplitter;
+    m_tempoCurveSplitter->setOrientation(Qt::Vertical);
+    m_tempoCurveSplitter->addWidget(m_mainScroll);
+    m_tempoCurveSplitter->addWidget(m_tempoCurveWidget);
+    m_tempoCurveSplitter->setSizes({ 120, 80 });
+    layout->addWidget(m_tempoCurveSplitter, 0, 0, 1, 3);
+    
+    layout->addWidget(m_overview, 1, 0);
+    layout->addWidget(m_playSpeed, 1, 1);
+    layout->addWidget(m_mainLevelPan, 1, 2);
 
     m_playControlsWidth = 
         m_mainLevelPan->width() + m_playSpeed->width() + layout->spacing() * 2;
@@ -737,6 +741,12 @@ MainWindow::~MainWindow()
     delete m_versionTester;
     delete m_surveyer;
 //    SVDEBUG << "MainWindow::~MainWindow finishing" << endl;
+}
+
+void
+MainWindow::resizeConstrained(QSize size)
+{
+    MainWindowBase::resizeConstrained(size);
 }
 
 void

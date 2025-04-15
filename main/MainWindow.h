@@ -59,6 +59,8 @@ public slots:
     void preferenceChanged(sv::PropertyContainer::PropertyName) override;
     virtual void coloursChanged();
 
+    virtual void resizeConstrained(QSize);
+    
     virtual bool commitData(bool mayAskUser);
 
     void goFullScreen();
@@ -230,6 +232,7 @@ protected:
     sv::Overview            *m_overview;
     sv::LevelPanToolButton  *m_mainLevelPan;
     sv::AudioDial           *m_playSpeed;
+    QSplitter               *m_tempoCurveSplitter;
     TempoCurveWidget        *m_tempoCurveWidget;
     ScoreWidget             *m_scoreWidget;
     QScrollArea             *m_mainScroll;
