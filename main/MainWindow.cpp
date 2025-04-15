@@ -707,18 +707,18 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     
     m_showPropertyBoxesAction->trigger();
 
-    connect(&m_session, SIGNAL(alignmentReadyForReview(sv::Pane *, sv::Layer *)),
-            this, SLOT(alignmentReadyForReview(sv::Pane *, sv::Layer *)));
-    connect(&m_session, SIGNAL(alignmentModified()),
-            this, SLOT(alignmentModified()));
-    connect(&m_session, SIGNAL(alignmentAccepted()),
-            this, SLOT(alignmentAccepted()));
-    connect(&m_session, SIGNAL(alignmentRejected()),
-            this, SLOT(alignmentRejected()));
-    connect(&m_session, SIGNAL(alignmentFrameIlluminated(sv_frame_t)),
-            this, SLOT(alignmentFrameIlluminated(sv_frame_t)));
-    connect(&m_session, SIGNAL(alignmentFailedToRun(QString)),
-            this, SLOT(alignmentFailedToRun(QString)));
+    connect(&m_session, &Session::alignmentReadyForReview,
+            this, &MainWindow::alignmentReadyForReview);
+    connect(&m_session, &Session::alignmentModified,
+            this, &MainWindow::alignmentModified);
+    connect(&m_session, &Session::alignmentAccepted,
+            this, &MainWindow::alignmentAccepted);
+    connect(&m_session, &Session::alignmentRejected,
+            this, &MainWindow::alignmentRejected);
+    connect(&m_session, &Session::alignmentEventIlluminated,
+            this, &MainWindow::alignmentEventIlluminated);
+    connect(&m_session, &Session::alignmentFailedToRun,
+            this, &MainWindow::alignmentFailedToRun);
 
     QTimer::singleShot(250, this, &MainWindow::introduction);
 
@@ -2794,6 +2794,12 @@ MainWindow::highlightFrameInScore(sv_frame_t frame)
     if (label == "") {
         return;
     }
+    highlightLabelInScore(label);
+}
+
+void
+MainWindow::highlightLabelInScore(QString label)
+{
     m_scoreWidget->setHighlightEventByLabel(label.toStdString());
     m_tempoCurveWidget->setHighlightedPosition(label);
 }
@@ -3007,11 +3013,16 @@ MainWindow::scoreInteractionEnded(ScoreWidget::InteractionMode)
 }
 
 void
-MainWindow::alignmentFrameIlluminated(sv_frame_t frame)
+MainWindow::alignmentEventIlluminated(sv_frame_t frame, QString label)
 {
     if (m_scoreWidget->getInteractionMode() ==
         ScoreWidget::InteractionMode::Edit) {
-        highlightFrameInScore(frame);
+
+        if (label == "") {
+            highlightFrameInScore(frame);
+        } else {
+            highlightLabelInScore(label);
+        }
     }
 }
 

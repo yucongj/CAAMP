@@ -164,11 +164,12 @@ protected slots:
     void alignmentModified();
     void alignmentAccepted();
     void alignmentRejected();
-    void alignmentFrameIlluminated(sv::sv_frame_t);
+    void alignmentEventIlluminated(sv::sv_frame_t, QString);
     void alignmentFailedToRun(QString);
     void populateScoreAlignerChoiceMenu();
     void scoreAlignerChosen(sv::TransformId);
     void highlightFrameInScore(sv::sv_frame_t);
+    void highlightLabelInScore(QString);
     void scoreSelectionChanged(Fraction, bool, ScoreWidget::EventLabel, Fraction, bool, ScoreWidget::EventLabel);
     void scorePageChanged(int page);
     void scorePageDownButtonClicked();

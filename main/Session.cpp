@@ -722,7 +722,7 @@ Session::setOnsetsLayerProperties(TimeInstantLayer *onsetsLayer)
 //    onsetsLayer->setFillSegments(false);
 
     connect(onsetsLayer, &TimeInstantLayer::frameIlluminated,
-            this, &Session::alignmentFrameIlluminated);
+            this, &Session::frameIlluminated);
 
     auto playParams = PlayParameterRepository::getInstance()->getPlayParameters
         (onsetsLayer->getModel().untyped);
@@ -731,6 +731,28 @@ Session::setOnsetsLayerProperties(TimeInstantLayer *onsetsLayer)
     } else {
         SVDEBUG << "Session::setOnsetsLayerProperties: WARNING: No play parameters found for model " << onsetsLayer->getModel().untyped << endl;
     }
+}
+
+void
+Session::frameIlluminated(sv_frame_t frame)
+{
+    TimeInstantLayer *layer = dynamic_cast<TimeInstantLayer *>(sender());
+    if (!layer) return;
+
+    auto model = ModelById::getAs<SparseOneDimensionalModel>(layer->getModel());
+    if (!model) return;
+
+    auto events = model->getEventsStartingAt(frame);
+    QString label;
+
+    if (events.empty()) {
+        SVDEBUG << "Session::frameIlluminated: no event found at frame "
+                << frame << ", emitting with frame only?" << endl;
+    } else {
+        label = events[0].getLabel();
+    }
+
+    emit alignmentEventIlluminated(frame, label);
 }
 
 void

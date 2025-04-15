@@ -114,7 +114,7 @@ signals:
     void alignmentAccepted();
     void alignmentRejected();
     void alignmentModified();
-    void alignmentFrameIlluminated(sv::sv_frame_t);
+    void alignmentEventIlluminated(sv::sv_frame_t, QString label);
 
     // This indicates a technical problem starting alignment, e.g. no
     // plugin available, not that the aligner failed to align
@@ -125,6 +125,7 @@ protected slots:
     void modelChangedWithin(sv::ModelId, sv::sv_frame_t, sv::sv_frame_t);
     void modelReady(sv::ModelId);
     void paneCentreOrZoomChanged();
+    void frameIlluminated(sv::sv_frame_t);
     
 private:
     // I don't own any of these. The SV main window owns the document
