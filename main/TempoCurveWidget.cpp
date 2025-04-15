@@ -58,6 +58,7 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_hthumb(nullptr),
     m_reset(nullptr)
 {
+    setMouseTracking(true);
     updateHeadsUpDisplay();
 }
 
@@ -331,7 +332,8 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
     
     for (auto c: m_curves) {
         if (auto model = ModelById::getAs<SparseTimeValueModel>(c.second)) {
-            paintCurve(model, m_colours[c.first], barStart, barEnd);
+            paintCurve(model, m_colours[c.first], barStart, barEnd,
+                       c.second == m_closeTempoModel);
         }
     }
 
@@ -389,16 +391,37 @@ TempoCurveWidget::frameToBarAndFraction(sv_frame_t frame, ModelId audioModelId)
 double
 TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
 {
+    double barAndFraction = -1.0;
+
+    auto itr = m_labelToBarCache.find(label);
+    if (itr != m_labelToBarCache.end()) {
+        barAndFraction = itr.value();
+        if (okp) {
+            *okp = (barAndFraction >= 0.0);
+        }
+    } else {
+        barAndFraction = labelToBarAndFractionUncached(label, okp);
+        m_labelToBarCache[label] = barAndFraction;
+    }
+
+    return barAndFraction;
+}
+
+double
+TempoCurveWidget::labelToBarAndFractionUncached(QString label, bool *okp) const
+{
     bool okv = false;
     bool &ok = (okp ? *okp : okv);
+
+    double badValue = -1.0;
     
     ok = false;
 
     QStringList barAndFraction = label.split("+");
-    if (barAndFraction.size() != 2) return 0.0;
+    if (barAndFraction.size() != 2) return badValue;
 
     int bar = barAndFraction[0].toInt(&ok);
-    if (!ok) return 0.0;
+    if (!ok) return badValue;
 
     auto sig = getTimeSignature(bar);
 
@@ -408,13 +431,13 @@ TempoCurveWidget::labelToBarAndFraction(QString label, bool *okp) const
 #endif
     
     QStringList numAndDenom = barAndFraction[1].split("/");
-    if (numAndDenom.size() != 2) return 0.0;
+    if (numAndDenom.size() != 2) return badValue;
 
     int num = numAndDenom[0].toInt(&ok);
-    if (!ok) return 0.0;
+    if (!ok) return badValue;
     
     int denom = numAndDenom[1].toInt(&ok);
-    if (!ok) return 0.0;
+    if (!ok) return badValue;
 
     double pos = double(num) / (denom > 0 ? double(denom) : 1.0);
     double len = double(sig.first) / (sig.second > 0 ? double(sig.second) : 1.0);
@@ -475,7 +498,8 @@ TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd)
 
 void
 TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
-                             QColor colour, double barStart, double barEnd)
+                             QColor colour, double barStart, double barEnd,
+                             bool isCloseTempoModel)
 {
     QPainter paint(this);
     paint.setRenderHint(QPainter::Antialiasing, true);
@@ -493,15 +517,20 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
 
     QPen pointPen(colour, 4.0);
     pointPen.setCapStyle(Qt::RoundCap);
+
+    QPen closePointPen(colour, 8.0);
+    closePointPen.setCapStyle(Qt::RoundCap);
+
     QPen linePen(colour, 1.0);
     
     for (auto p : points) {
         
         bool ok = false;
-        double bar = labelToBarAndFraction(p.getLabel(), &ok);
+        QString label = p.getLabel();
+        double bar = labelToBarAndFraction(label, &ok);
         
         if (!ok) {
-            SVDEBUG << "TempoCurveWidget::paintCurve: Failed to parse bar and fraction \"" << p.getLabel() << "\"" << endl;
+            SVDEBUG << "TempoCurveWidget::paintCurve: Failed to parse bar and fraction \"" << label << "\"" << endl;
             continue;
         }
         if (bar < barStart) {
@@ -514,7 +543,7 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
 
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
         SVDEBUG << "TempoCurveWidget::paintCurve: frame = "
-                << p.getFrame() << ", label = " << p.getLabel()
+                << p.getFrame() << ", label = " << label
                 << ", bar = " << bar << ", value = " << p.getValue()
                 << ", minValue = " << minValue << ", maxValue = "
                 << maxValue << ", x = " << x << ", y = " << y << endl;
@@ -524,8 +553,13 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
             paint.setPen(linePen);
             paint.drawLine(px, py, x, y);
         }
-            
-        paint.setPen(pointPen);
+
+        if (isCloseTempoModel && label == m_closeLabel) {
+            paint.setPen(closePointPen);
+        } else {
+            paint.setPen(pointPen);
+        }
+        
         paint.drawPoint(x, y);
 
         px = x;
@@ -670,6 +704,13 @@ TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
 
     QPoint pos = e->pos();
 
+    if (!m_clickedInRange) {
+        if (identifyClosePoint(e->pos())) {
+            update();
+        }
+        return;
+    }
+    
     if (m_clickedInRange && !m_releasing) {
 
         // if no buttons pressed, and not called from
@@ -714,50 +755,69 @@ TempoCurveWidget::mouseClickedOnly(QMouseEvent *e)
             return;
         }
     }
-*/  
+*/
+    if (!identifyClosePoint(e->pos())) {
+        return;
+    }
+
     for (auto c : m_curves) {
-        if (c.first != m_currentAudioModel &&
-            checkCloseTo(e->pos().x(), e->pos().y(), c.second)) {
+        if (c.second == m_closeTempoModel) {
             SVDEBUG << "TempoCurveWidget::mouseClickedOnly: asking to change to model " << c.first << endl;
             emit changeCurrentAudioModel(c.first);
+            break;
         }
     }
 }
 
 bool
-TempoCurveWidget::checkCloseTo(double x, double y, ModelId tempoModel)
+TempoCurveWidget::identifyClosePoint(QPoint pos)
 {
-    auto model = ModelById::getAs<SparseTimeValueModel>(tempoModel);
-    if (!model) return false;
+    double threshold = ViewManager::scalePixelSize(15);
+    double closest = threshold;
 
-    EventVector points(model->getAllEvents()); //!!! for now...
+    m_closeTempoModel = {};
+    m_closeLabel = {};
 
-    double threshold = ViewManager::scalePixelSize(10); 
+    double x = pos.x();
+    double y = pos.y();
+    
+    for (auto c : m_curves) {
+
+        auto model = ModelById::getAs<SparseTimeValueModel>(c.second);
+        if (!model) continue;
+
+        EventVector points(model->getAllEvents()); //!!! for now...
         
-    for (auto p : points) {
+        for (auto p : points) {
         
-        bool ok = false;
-        double bar = labelToBarAndFraction(p.getLabel(), &ok);
-        if (!ok) continue;
+            double py = m_coordinateScale.getCoordForValue(this, p.getValue());
+            if (py < 0 || py > height() || fabs(py - y) > threshold) {
+                continue;
+            }
 
-        double px = barToX(bar, m_barDisplayStart, m_barDisplayEnd);
+            QString label = p.getLabel();
+            
+            bool ok = false;
+            double bar = labelToBarAndFraction(label, &ok);
+            if (!ok) continue;
 
-        if (px < 0) {
-            continue;
-        }
-        
-        double py = m_coordinateScale.getCoordForValue(this, p.getValue());
+            double px = barToX(bar, m_barDisplayStart, m_barDisplayEnd);
+            if (px < 0) continue;
 
-        if (fabs(px - x) < threshold && fabs(py - y) < threshold) {
-            return true;
-        }
+            double dist = sqrt((px - x) * (px - x) + (py - y) * (py - y));
+            if (dist < closest) {
+                m_closeTempoModel = c.second;
+                m_closeLabel = label;
+                closest = dist;
+            }
 
-        if (px > x) {
-            break;
+            if (px > x) {
+                break;
+            }
         }
     }
 
-    return false;
+    return !m_closeTempoModel.isNone();
 }
 
 void
@@ -773,6 +833,11 @@ TempoCurveWidget::enterEvent(QEnterEvent *)
 void
 TempoCurveWidget::leaveEvent(QEvent *)
 {
+    if (m_closeLabel != "") {
+        m_closeTempoModel = {};
+        m_closeLabel = {};
+        update();
+    }
 }
 
 void

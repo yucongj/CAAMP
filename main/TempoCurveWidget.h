@@ -81,6 +81,7 @@ protected:
 private:
     std::map<sv::ModelId, sv::ModelId> m_curves; // audio model -> tempo model
     std::map<sv::ModelId, QColor> m_colours; // audio model -> colour
+    mutable QHash<QString, double> m_labelToBarCache;
     QString m_crotchet;
     sv::CoordinateScale m_coordinateScale;
     int m_colourCounter;
@@ -104,13 +105,16 @@ private:
     bool m_releasing;
     int m_pendingWheelAngle;
 
+    sv::ModelId m_closeTempoModel;
+    QString m_closeLabel;
+    
     QWidget *m_headsUpDisplay;
     sv::Thumbwheel *m_hthumb;
     sv::NotifyingPushButton *m_reset;
     void updateHeadsUpDisplay();
 
     void mouseClickedOnly(QMouseEvent *);
-    bool checkCloseTo(double x, double y, sv::ModelId tempoModel);
+    bool identifyClosePoint(QPoint pos);
     
     std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
     std::pair<int, int> getTimeSignature(int bar) const;
@@ -124,9 +128,11 @@ private:
     double frameToBarAndFraction(sv::sv_frame_t frame,
                                  sv::ModelId audioModel) const;
     double labelToBarAndFraction(QString label, bool *ok) const;
+    double labelToBarAndFractionUncached(QString label, bool *ok) const;
     void paintBarAndBeatLines(double barStart, double barEnd);
     void paintCurve(std::shared_ptr<sv::SparseTimeValueModel> tempoCurveModel,
-                    QColor colour, double barStart, double barEnd);
+                    QColor colour, double barStart, double barEnd,
+                    bool isCloseTempoModel);
     void paintLabels();
 
     void setPaintFont(QPainter &paint);
