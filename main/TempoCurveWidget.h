@@ -52,6 +52,8 @@ public:
     QColor getForeground() const override { return Qt::black; }
     QColor getBackground() const override { return Qt::white; }
 
+    enum class TempoResolution { perNote, perBeat, perBar };
+
 signals:
     void changeCurrentAudioModel(sv::ModelId toAudioModel);
 
@@ -64,6 +66,7 @@ public slots:
     void zoom(bool in);
     void zoomTo(double duration);
     void horizontalThumbwheelMoved(int value);
+    void changeTempoResolution(TempoResolution);
     
 protected:
     void paintEvent(QPaintEvent *e) override;
@@ -75,6 +78,7 @@ protected:
     void leaveEvent(QEvent *e) override;
     void wheelEvent(QWheelEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
+    void contextMenuEvent(QContextMenuEvent *e) override;
     void wheelVertical(int sign, Qt::KeyboardModifiers);
     void wheelHorizontal(int sign, Qt::KeyboardModifiers);
 
@@ -96,6 +100,7 @@ private:
     Score::MusicalEventList m_musicalEvents;
     int m_firstBar;
     int m_lastBar;
+    TempoResolution m_resolution;
 
     QPoint m_clickPos;
     double m_clickBarDisplayStart;
@@ -107,6 +112,8 @@ private:
 
     sv::ModelId m_closeTempoModel;
     QString m_closeLabel;
+
+    QMenu *m_contextMenu;
     
     QWidget *m_headsUpDisplay;
     sv::Thumbwheel *m_hthumb;

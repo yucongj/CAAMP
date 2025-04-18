@@ -26,6 +26,9 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QGridLayout>
+#include <QMenu>
+#include <QAction>
+#include <QActionGroup>
 
 using namespace std;
 using namespace sv;
@@ -50,6 +53,7 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_barDisplayEnd(m_defaultBarCount),
     m_firstBar(1),
     m_lastBar(1),
+    m_resolution(TempoResolution::perNote),
     m_clickedInRange(false),
     m_dragging(false),
     m_releasing(false),
@@ -60,6 +64,26 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
 {
     setMouseTracking(true);
     updateHeadsUpDisplay();
+
+    m_contextMenu = new QMenu(this);
+    QActionGroup *tempoGroup = new QActionGroup(this);
+    vector<pair<QString, TempoResolution>> resolutions {
+        { tr("Tempo per Note"), TempoResolution::perNote },
+        { tr("Tempo per Beat"), TempoResolution::perBeat },
+        { tr("Tempo per Bar"), TempoResolution::perBar }
+    };
+    for (const auto &r : resolutions) {
+        QAction *action =
+            m_contextMenu->addAction(r.first, this,
+                                     [=]() {
+                                         changeTempoResolution(r.second);
+                                     });
+        action->setCheckable(true);
+        tempoGroup->addAction(action);
+        if (r.second == m_resolution) {
+            action->setChecked(true);
+        }
+    }
 }
 
 TempoCurveWidget::~TempoCurveWidget()
@@ -527,6 +551,8 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
         
         bool ok = false;
         QString label = p.getLabel();
+        double tempo = p.getValue();
+        
         double bar = labelToBarAndFraction(label, &ok);
         
         if (!ok) {
@@ -539,7 +565,7 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
 
         double x = barToX(bar, barStart, barEnd);
 
-        double y = m_coordinateScale.getCoordForValue(this, p.getValue());
+        double y = m_coordinateScale.getCoordForValue(this, tempo);
 
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
         SVDEBUG << "TempoCurveWidget::paintCurve: frame = "
@@ -564,6 +590,7 @@ TempoCurveWidget::paintCurve(shared_ptr<SparseTimeValueModel> model,
 
         px = x;
         py = y;
+
         first = false;
     }
 
@@ -767,6 +794,21 @@ TempoCurveWidget::mouseClickedOnly(QMouseEvent *e)
             break;
         }
     }
+}
+
+void
+TempoCurveWidget::contextMenuEvent(QContextMenuEvent *e)
+{
+    m_contextMenu->popup(mapToGlobal(e->pos()));
+}
+
+void
+TempoCurveWidget::changeTempoResolution(TempoResolution resolution)
+{
+    SVDEBUG << "TempoResolution::changeTempoResolution: "
+            << int(resolution) << endl;
+    m_resolution = resolution;
+    update();
 }
 
 bool
