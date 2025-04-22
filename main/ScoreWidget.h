@@ -121,6 +121,13 @@ public slots:
     void setHighlightEventByLabel(EventLabel label);
 
     /**
+     * Set the current event to be highlighted and activated (as if
+     * clicked). The type of highlighting and activation will depend
+     * on the current interaction mode.
+     */
+    void activateEventByLabel(EventLabel label);
+
+    /**
      * Select an interaction mode.
      */
     void setInteractionMode(InteractionMode mode);
@@ -242,6 +249,7 @@ private:
     bool isSelectedAll() const;
 
     QRectF getHighlightRectFor(const EventData &);
+    void setHighlightEventByLabel(EventLabel label, bool activate);
     
     void findSystemExtents(QByteArray, std::shared_ptr<QSvgRenderer>);
 

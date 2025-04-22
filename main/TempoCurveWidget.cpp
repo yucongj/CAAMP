@@ -733,6 +733,7 @@ TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
 
     if (!m_clickedInRange) {
         if (identifyClosePoint(e->pos())) {
+            emit highlightLabel(m_closeLabel);
             update();
         }
         return;
@@ -791,6 +792,7 @@ TempoCurveWidget::mouseClickedOnly(QMouseEvent *e)
         if (c.second == m_closeTempoModel) {
             SVDEBUG << "TempoCurveWidget::mouseClickedOnly: asking to change to model " << c.first << endl;
             emit changeCurrentAudioModel(c.first);
+            emit activateLabel(m_closeLabel);
             break;
         }
     }

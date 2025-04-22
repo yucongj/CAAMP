@@ -567,6 +567,10 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     m_tempoCurveWidget = new TempoCurveWidget(frame);
     connect(m_tempoCurveWidget, &TempoCurveWidget::changeCurrentAudioModel,
             this, &MainWindow::tempoCurveRequestedAudioModelChange);
+    connect(m_tempoCurveWidget, &TempoCurveWidget::highlightLabel,
+            this, &MainWindow::highlightLabelInScore);
+    connect(m_tempoCurveWidget, &TempoCurveWidget::activateLabel,
+            this, &MainWindow::activateLabelInScore);
     
     m_overview = new Overview(frame);
     m_overview->setViewManager(m_viewManager);
@@ -2795,13 +2799,25 @@ MainWindow::highlightFrameInScore(sv_frame_t frame)
         return;
     }
     highlightLabelInScore(label);
+    highlightLabelInTempoCurve(label);
+}
+
+void
+MainWindow::highlightLabelInTempoCurve(QString label)
+{
+    m_tempoCurveWidget->setHighlightedPosition(label);
 }
 
 void
 MainWindow::highlightLabelInScore(QString label)
 {
     m_scoreWidget->setHighlightEventByLabel(label.toStdString());
-    m_tempoCurveWidget->setHighlightedPosition(label);
+}
+
+void
+MainWindow::activateLabelInScore(QString label)
+{
+    m_scoreWidget->activateEventByLabel(label.toStdString());
 }
 
 void

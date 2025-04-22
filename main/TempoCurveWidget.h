@@ -56,6 +56,8 @@ public:
 
 signals:
     void changeCurrentAudioModel(sv::ModelId toAudioModel);
+    void highlightLabel(QString label);
+    void activateLabel(QString label);
 
 public slots:
     void setHighlightedPosition(QString label);

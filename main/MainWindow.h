@@ -170,6 +170,8 @@ protected slots:
     void scoreAlignerChosen(sv::TransformId);
     void highlightFrameInScore(sv::sv_frame_t);
     void highlightLabelInScore(QString);
+    void highlightLabelInTempoCurve(QString);
+    void activateLabelInScore(QString);
     void scoreSelectionChanged(Fraction, bool, ScoreWidget::EventLabel, Fraction, bool, ScoreWidget::EventLabel);
     void scorePageChanged(int page);
     void scorePageDownButtonClicked();
