@@ -85,8 +85,14 @@ protected:
     void wheelHorizontal(int sign, Qt::KeyboardModifiers);
 
 private:
-    std::map<sv::ModelId, sv::ModelId> m_curves; // audio model -> tempo model
-    std::map<sv::ModelId, QColor> m_colours; // audio model -> colour
+    // m_tempoModels contains the original models; m_curves contains
+    // synthetic events generated from each model at the currently
+    // active resolution. (If the resolution is perNote, the curves
+    // are the same as the events found in the corresponding models.)
+    // In all cases the map key is the audio model id.
+    std::map<sv::ModelId, sv::ModelId> m_tempoModels;
+    std::map<sv::ModelId, sv::EventVector> m_curves;
+    std::map<sv::ModelId, QColor> m_colours;
     mutable QHash<QString, double> m_labelToBarCache;
     QString m_crotchet;
     sv::CoordinateScale m_coordinateScale;
@@ -131,6 +137,8 @@ private:
     double barToX(double bar, double barStart, double barEnd) const;
     double xToBar(double x, double barStart, double barEnd) const;
 
+    sv::EventVector extractCurve(sv::ModelId tempoCurveModelId) const;
+    
     bool isBarVisible(double bar);
     void ensureBarVisible(double bar);
 
@@ -139,9 +147,8 @@ private:
     double labelToBarAndFraction(QString label, bool *ok) const;
     double labelToBarAndFractionUncached(QString label, bool *ok) const;
     void paintBarAndBeatLines(double barStart, double barEnd);
-    void paintCurve(std::shared_ptr<sv::SparseTimeValueModel> tempoCurveModel,
-                    QColor colour, double barStart, double barEnd,
-                    bool isCloseTempoModel);
+    void paintCurve(sv::ModelId audioModelId, QColor colour,
+                    double barStart, double barEnd, bool isCloseTempoModel);
     void paintLabels();
 
     void setPaintFont(QPainter &paint);
