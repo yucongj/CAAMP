@@ -69,7 +69,8 @@ public slots:
     void zoomTo(double duration);
     void horizontalThumbwheelMoved(int value);
     void verticalThumbwheelMoved(int value);
-    void setVerticalExtents(double min, double max);
+    void setTempoScaleExtents(double min, double max);
+    void changeTempoScaleExtents(); // asking the user
     void changeTempoResolution(TempoResolution);
     
 protected:

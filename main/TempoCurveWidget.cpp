@@ -21,6 +21,7 @@
 #include "svgui/widgets/NotifyingPushButton.h"
 #include "svgui/view/ViewManager.h"
 #include "svgui/widgets/IconLoader.h"
+#include "svgui/widgets/RangeInputDialog.h"
 
 #include <QPainter>
 #include <QMouseEvent>
@@ -37,6 +38,11 @@ using namespace sv;
 
 static double defaultTempoMin = 40.0;
 static double defaultTempoMax = 200.0;
+
+// for the displayed range; we don't care if actual values are outside
+// this range, we just can't show them:
+static double overallTempoMin = 4.0;
+static double overallTempoMax = 400.0;
 
 TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     QFrame(parent),
@@ -87,6 +93,9 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
             action->setChecked(true);
         }
     }
+    m_contextMenu->addSeparator();
+    m_contextMenu->addAction(tr("Set Tempo Scale Extents..."),
+                             this, &TempoCurveWidget::changeTempoScaleExtents);
 }
 
 TempoCurveWidget::~TempoCurveWidget()
@@ -144,7 +153,7 @@ TempoCurveWidget::updateHeadsUpDisplay()
         connect(m_reset, &NotifyingPushButton::clicked,
                 [=]() {
                     m_hthumb->resetToDefault();
-                    setVerticalExtents(defaultTempoMin, defaultTempoMax);
+                    setTempoScaleExtents(defaultTempoMin, defaultTempoMax);
                 });
     }
     
@@ -1194,18 +1203,49 @@ TempoCurveWidget::verticalThumbwheelMoved(int value)
     double dist = (102.0 - value);
     
     double min = centre - dist * 2;
-    if (min < 4.0) min = 4.0;
+    if (min < overallTempoMin) min = overallTempoMin;
     
     double max = centre + dist * 2;
-    if (max > 400.0) max = 400.0;
+    if (max > overallTempoMax) max = overallTempoMax;
 
-    setVerticalExtents(min, max);
+    setTempoScaleExtents(min, max);
 }
 
 void
-TempoCurveWidget::setVerticalExtents(double min, double max)
+TempoCurveWidget::setTempoScaleExtents(double min, double max)
 {
+    if (min < overallTempoMin) min = overallTempoMin;
+    if (max > overallTempoMax) max = overallTempoMax;
+    if (max < min + 1.0) {
+        max = min + 1.0;
+    }
     m_coordinateScale = m_coordinateScale.withDisplayExtents(min, max);
     update();
 }    
+
+void
+TempoCurveWidget::changeTempoScaleExtents()
+{
+    QString unit = "bpm";
+    RangeInputDialog dialog(tr("Enter tempo range"),
+                            tr("New tempo display range, from %1 to %2 %3:")
+                            .arg(overallTempoMin).arg(overallTempoMax).arg(unit),
+                            unit, overallTempoMin, overallTempoMax, this);
+
+    dialog.setRange(m_coordinateScale.getDisplayMinimum(),
+                    m_coordinateScale.getDisplayMaximum());
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    float newmin, newmax;
+    dialog.getRange(newmin, newmax);
+
+    double dist = (newmax - newmin) / 2.0;
+    double wheelValue = round(102.0 - dist);
+    m_vthumb->setValue(wheelValue);
+    
+    setTempoScaleExtents(newmin, newmax);
+}
 
