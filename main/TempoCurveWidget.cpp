@@ -34,7 +34,7 @@
 using namespace std;
 using namespace sv;
 
-#define DEBUG_TEMPO_CURVE_WIDGET 1
+//#define DEBUG_TEMPO_CURVE_WIDGET 1
 
 static double defaultTempoMin = 40.0;
 static double defaultTempoMax = 200.0;
@@ -64,7 +64,7 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_lastBar(1),
     m_resolution(TempoResolution::perNote),
     m_clickedInRange(false),
-    m_dragging(false),
+    m_dragMode(UnresolvedDrag),
     m_releasing(false),
     m_pendingWheelAngle(0),
     m_headsUpDisplay(nullptr),
@@ -96,6 +96,10 @@ TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     m_contextMenu->addSeparator();
     m_contextMenu->addAction(tr("Set Tempo Scale Extents..."),
                              this, &TempoCurveWidget::changeTempoScaleExtents);
+
+    setTempoScaleExtents(m_coordinateScale.getDisplayMinimum(),
+                         m_coordinateScale.getDisplayMaximum(),
+                         true); // make sure wheel is updated by a single route
 }
 
 TempoCurveWidget::~TempoCurveWidget()
@@ -153,7 +157,7 @@ TempoCurveWidget::updateHeadsUpDisplay()
         connect(m_reset, &NotifyingPushButton::clicked,
                 [=]() {
                     m_hthumb->resetToDefault();
-                    setTempoScaleExtents(defaultTempoMin, defaultTempoMax);
+                    setTempoScaleExtents(defaultTempoMin, defaultTempoMax, true);
                 });
     }
     
@@ -865,8 +869,10 @@ TempoCurveWidget::mousePressEvent(QMouseEvent *e)
     m_clickPos = e->pos();
     m_clickBarDisplayStart = m_barDisplayStart;
     m_clickBarDisplayEnd = m_barDisplayEnd;
+    m_clickTempoMin = m_coordinateScale.getDisplayMinimum();
+    m_clickTempoMax = m_coordinateScale.getDisplayMaximum();
     m_clickedInRange = true;
-    m_dragging = false;
+    m_dragMode = UnresolvedDrag;
     m_releasing = false;
 }
 
@@ -882,12 +888,12 @@ TempoCurveWidget::mouseReleaseEvent(QMouseEvent *e)
         mouseMoveEvent(e);
         m_releasing = false;
 
-        if (!m_dragging) {
+        if (m_dragMode == UnresolvedDrag) {
             mouseClickedOnly(e);
         }
     }
 
-    m_dragging = false;
+    m_dragMode = UnresolvedDrag;
     m_clickedInRange = false;
 }
 
@@ -922,23 +928,41 @@ TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
         }
     }
 
-    double dist = pos.x() - m_clickPos.x();
-    double threshold = 2.0;
-    if (fabs(dist) < threshold) {
-        return;
+    double distx = pos.x() - m_clickPos.x();
+    double disty = pos.y() - m_clickPos.y();
+    double threshold = 4.0;
+
+    if (m_dragMode == UnresolvedDrag) {
+        if (fabs(distx) > threshold) {
+            m_dragMode = HorizontalDrag;
+        } else if (fabs(disty) > threshold) {
+            m_dragMode = VerticalDrag;
+        } else {
+            return;
+        }
     }
 
-    m_dragging = true;
-    
-    double clickAvgBarWidth = width();
-    if (m_barDisplayEnd > m_barDisplayStart) {
-        clickAvgBarWidth /= (m_barDisplayEnd - m_barDisplayStart);
-    }
+    if (m_dragMode == HorizontalDrag) {
 
-    double barDist = dist / clickAvgBarWidth;
-    m_barDisplayStart = m_clickBarDisplayStart - barDist;
-    m_barDisplayEnd = m_clickBarDisplayEnd - barDist;
-    
+        double clickAvgBarWidth = width();
+        if (m_barDisplayEnd > m_barDisplayStart) {
+            clickAvgBarWidth /= (m_barDisplayEnd - m_barDisplayStart);
+        }
+
+        double barDist = distx / clickAvgBarWidth;
+        m_barDisplayStart = m_clickBarDisplayStart - barDist;
+        m_barDisplayEnd = m_clickBarDisplayEnd - barDist;
+
+    } else if (m_dragMode == VerticalDrag) {
+
+        double prop = disty / height();
+        double centre = (m_clickTempoMin + m_clickTempoMax) / 2.0;
+        double extent = m_clickTempoMax - m_clickTempoMin;
+        double newCentre = centre + extent * prop;
+        setTempoScaleExtents(newCentre - extent/2.0, newCentre + extent/2.0,
+                             true);
+    }
+        
     update();
 }
 
@@ -1197,6 +1221,8 @@ TempoCurveWidget::horizontalThumbwheelMoved(int value)
 void
 TempoCurveWidget::verticalThumbwheelMoved(int value)
 {
+    SVDEBUG << "TempoCurveWidget::verticalThumbwheelMoved: " << value << endl;
+    
     double centre = (m_coordinateScale.getDisplayMinimum() +
                      m_coordinateScale.getDisplayMaximum()) / 2.0;
 
@@ -1208,17 +1234,33 @@ TempoCurveWidget::verticalThumbwheelMoved(int value)
     double max = centre + dist * 2;
     if (max > overallTempoMax) max = overallTempoMax;
 
-    setTempoScaleExtents(min, max);
+    SVDEBUG << "TempoCurveWidget::verticalThumbwheelMoved: centre "
+            << centre << ", dist " << dist << ", min " << min << ", max "
+            << max << endl;
+    
+    setTempoScaleExtents(min, max, false);
 }
 
 void
-TempoCurveWidget::setTempoScaleExtents(double min, double max)
+TempoCurveWidget::setTempoScaleExtents(double min, double max, bool updateWheel)
 {
+    SVDEBUG << "TempoCurveWidget::setTempoScaleExtents: " << min << " to "
+            << max << ", updateWheel = " << updateWheel << endl;
     if (min < overallTempoMin) min = overallTempoMin;
     if (max > overallTempoMax) max = overallTempoMax;
     if (max < min + 1.0) {
         max = min + 1.0;
     }
+
+    if (updateWheel) {
+        double dist = (max - min) / 4.0;
+        double wheelValue = round(102.0 - dist);
+        SVDEBUG << "TempoCurveWidget::setTempoScaleExtents: dist = " << dist
+                << ", changing wheel from "
+                << m_vthumb->getValue() << " to " << wheelValue << endl;
+        m_vthumb->setValue(wheelValue);
+    }
+
     m_coordinateScale = m_coordinateScale.withDisplayExtents(min, max);
     update();
 }    
@@ -1241,11 +1283,6 @@ TempoCurveWidget::changeTempoScaleExtents()
 
     float newmin, newmax;
     dialog.getRange(newmin, newmax);
-
-    double dist = (newmax - newmin) / 2.0;
-    double wheelValue = round(102.0 - dist);
-    m_vthumb->setValue(wheelValue);
-    
-    setTempoScaleExtents(newmin, newmax);
+    setTempoScaleExtents(newmin, newmax, true);
 }
 

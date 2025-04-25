@@ -70,7 +70,7 @@ public slots:
     void zoomTo(double duration);
     void horizontalThumbwheelMoved(int value);
     void verticalThumbwheelMoved(int value);
-    void setTempoScaleExtents(double min, double max);
+    void setTempoScaleExtents(double min, double max, bool updateWheel);
     void changeTempoScaleExtents(); // asking the user
     void changeTempoResolution(TempoResolution);
     
@@ -117,8 +117,17 @@ private:
     QPoint m_clickPos;
     double m_clickBarDisplayStart;
     double m_clickBarDisplayEnd;
+    double m_clickTempoMin;
+    double m_clickTempoMax;
     bool m_clickedInRange;
-    bool m_dragging;
+
+    enum DragMode {
+        UnresolvedDrag,
+        VerticalDrag,
+        HorizontalDrag
+    };
+    DragMode m_dragMode;
+    
     bool m_releasing;
     int m_pendingWheelAngle;
 
