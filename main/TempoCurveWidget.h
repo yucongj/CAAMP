@@ -17,6 +17,7 @@
 #include <QFrame>
 #include <QTimer>
 #include <QColor>
+#include <QMenu>
 
 #include <map>
 

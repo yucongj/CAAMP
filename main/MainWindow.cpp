@@ -6027,15 +6027,18 @@ MainWindow::currentPaneChanged(Pane *pane)
     sv_frame_t playingFrame = 0;
     if (m_playSource && m_playSource->isPlaying()) {
         playingFrame = m_playSource->getCurrentPlayingFrame();
-        m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
-            (m_session.getOnsetsLayer(), playingFrame, scoreLabel, proportion);
         wasPlaying = true;
-        SVDEBUG << "currentPaneChanged: mapped current playing frame "
-                << playingFrame << " to score label " << scoreLabel
-                << " and proportion " << proportion << endl;
-        if (scoreLabel != "") {
-            m_playSource->stop();
-        }
+    } else {
+        playingFrame = m_viewManager->getPlaybackFrame();
+    }
+
+    m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
+        (m_session.getOnsetsLayer(), playingFrame, scoreLabel, proportion);
+    SVDEBUG << "currentPaneChanged: mapped current frame "
+            << playingFrame << " to score label " << scoreLabel
+            << " and proportion " << proportion << endl;
+    if (scoreLabel != "" && wasPlaying) {
+        m_playSource->stop();
     }
 
     for (int i = pane->getLayerCount(); i > 0; ) {
@@ -6086,14 +6089,16 @@ MainWindow::currentPaneChanged(Pane *pane)
         m_playSource->setSoloModelSet({});
     }
     
-    if (wasPlaying) {
-        if (scoreLabel != "") {
-            m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
-                (m_session.getOnsetsLayer(), scoreLabel, proportion, playingFrame);
-            SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
-                    << " and proportion " << proportion
-                    << " back to playback frame " << playingFrame << endl;
+    if (scoreLabel != "") {
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (m_session.getOnsetsLayer(), scoreLabel, proportion, playingFrame);
+        SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
+                << " and proportion " << proportion
+                << " back to playback frame " << playingFrame << endl;
+        if (wasPlaying) {
             m_playSource->play(playingFrame);
+        } else {
+            m_viewManager->setPlaybackFrame(playingFrame);
         }
     }
 
