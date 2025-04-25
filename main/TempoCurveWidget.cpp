@@ -35,14 +35,17 @@ using namespace sv;
 
 #define DEBUG_TEMPO_CURVE_WIDGET 1
 
+static double defaultTempoMin = 40.0;
+static double defaultTempoMax = 200.0;
+
 TempoCurveWidget::TempoCurveWidget(QWidget *parent) :
     QFrame(parent),
     m_crotchet(QChar(0x2669)),
     m_coordinateScale(CoordinateScale::Direction::Vertical,
                       QString("%1/min").arg(m_crotchet), // unit
                       false,                             // logarithmic
-                      40.0,
-                      200.0),
+                      defaultTempoMin,
+                      defaultTempoMax),
     m_colourCounter(0),
     m_margin(0),
     m_highlightedPosition(-1.0),
@@ -115,6 +118,18 @@ TempoCurveWidget::updateHeadsUpDisplay()
         connect(m_hthumb, SIGNAL(valueChanged(int)), this, 
                 SLOT(horizontalThumbwheelMoved(int)));
 
+        m_vthumb = new Thumbwheel(Qt::Vertical);
+        m_vthumb->setObjectName(tr("Vertical Zoom"));
+        m_vthumb->setCursor(Qt::ArrowCursor);
+        layout->addWidget(m_vthumb, 0, 2);
+        m_vthumb->setMinimumValue(1);
+        m_vthumb->setMaximumValue(100);
+        m_vthumb->setDefaultValue(40);
+        m_vthumb->setFixedWidth(ViewManager::scalePixelSize(16));
+        m_vthumb->setFixedHeight(ViewManager::scalePixelSize(70));
+        connect(m_vthumb, SIGNAL(valueChanged(int)), this, 
+                SLOT(verticalThumbwheelMoved(int)));
+
         m_reset = new NotifyingPushButton;
         m_reset->setFlat(true);
         m_reset->setCursor(Qt::ArrowCursor);
@@ -126,7 +141,11 @@ TempoCurveWidget::updateHeadsUpDisplay()
         
         layout->setColumnStretch(0, 20);
 
-        connect(m_reset, SIGNAL(clicked()), m_hthumb, SLOT(resetToDefault()));
+        connect(m_reset, &NotifyingPushButton::clicked,
+                [=]() {
+                    m_hthumb->resetToDefault();
+                    setVerticalExtents(defaultTempoMin, defaultTempoMax);
+                });
     }
     
     if (!m_headsUpDisplay->isVisible()) {
@@ -134,9 +153,8 @@ TempoCurveWidget::updateHeadsUpDisplay()
     }
         
     int shift = ViewManager::scalePixelSize(86);
-    m_headsUpDisplay->setFixedHeight(m_hthumb->height());
-    m_headsUpDisplay->move(width() - shift,
-                           height() - ViewManager::scalePixelSize(16));
+    m_headsUpDisplay->setFixedHeight(m_vthumb->height() + m_hthumb->height());
+    m_headsUpDisplay->move(width() - shift, height() - shift);
 }
 
 void
@@ -1165,5 +1183,29 @@ void
 TempoCurveWidget::horizontalThumbwheelMoved(int value)
 {
     zoomTo(100 - value);
+}    
+
+void
+TempoCurveWidget::verticalThumbwheelMoved(int value)
+{
+    double centre = (m_coordinateScale.getDisplayMinimum() +
+                     m_coordinateScale.getDisplayMaximum()) / 2.0;
+
+    double dist = (102.0 - value);
+    
+    double min = centre - dist * 2;
+    if (min < 4.0) min = 4.0;
+    
+    double max = centre + dist * 2;
+    if (max > 400.0) max = 400.0;
+
+    setVerticalExtents(min, max);
+}
+
+void
+TempoCurveWidget::setVerticalExtents(double min, double max)
+{
+    m_coordinateScale = m_coordinateScale.withDisplayExtents(min, max);
+    update();
 }    
 

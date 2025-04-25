@@ -68,6 +68,8 @@ public slots:
     void zoom(bool in);
     void zoomTo(double duration);
     void horizontalThumbwheelMoved(int value);
+    void verticalThumbwheelMoved(int value);
+    void setVerticalExtents(double min, double max);
     void changeTempoResolution(TempoResolution);
     
 protected:
@@ -125,6 +127,7 @@ private:
     
     QWidget *m_headsUpDisplay;
     sv::Thumbwheel *m_hthumb;
+    sv::Thumbwheel *m_vthumb;
     sv::NotifyingPushButton *m_reset;
     void updateHeadsUpDisplay();
 
