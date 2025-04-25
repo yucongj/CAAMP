@@ -3989,6 +3989,8 @@ MainWindow::importMoreAudio()
     m_session.addFurtherAudioPane(pane);
     m_paneStack->sizePanesEqually();
 
+    currentPaneChanged(pane);
+    
     updateWindowTitle();
     updateMenuStates();
 }
