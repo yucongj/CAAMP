@@ -208,6 +208,7 @@ TempoCurveWidget::setMusicalEvents(const Score::MusicalEventList &musicalEvents)
     m_tempoModels.clear();
     m_curves.clear();
     m_colours.clear();
+    m_labelToBarCache.clear();
     m_colourCounter = 0;
 
     update();
