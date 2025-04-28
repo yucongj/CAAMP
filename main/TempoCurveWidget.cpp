@@ -331,7 +331,7 @@ TempoCurveWidget::ensureBarVisible(double bar)
 #endif
 
     if (isBarVisible(bar)) {
-        if (barToX(bar, m_barDisplayStart, m_barDisplayEnd) < width() * 0.9) {
+        if (barToX(bar) < width() * 0.9) {
             return;
         }
     }
@@ -345,7 +345,7 @@ TempoCurveWidget::ensureBarVisible(double bar)
         proposedStart = proposedStart - 1.0;
     }
     double proposedEnd = proposedStart + duration;
-    if (barToX(bar, proposedStart, proposedEnd) > width() / 2) {
+    if (barToXWith(bar, proposedStart, proposedEnd) > width() / 2) {
         proposedStart = bar;
         proposedEnd = proposedStart + duration;
     }
@@ -374,7 +374,7 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
 
     double barStart = m_barDisplayStart;
     double barEnd = m_barDisplayEnd;
-    if (barEnd <= 1.0) {
+    if (barEnd < m_firstBar) {
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
         SVDEBUG << "TempoCurveWidget::paintEvent: barEnd = " << barEnd << ", returning early" << endl;
 #endif
@@ -397,7 +397,7 @@ TempoCurveWidget::paintEvent(QPaintEvent *e)
     paintLabels();
 
     if (m_highlightedPosition >= 0.0) {
-        double x = barToX(m_highlightedPosition, barStart, barEnd);
+        double x = barToX(m_highlightedPosition);
         QPainter paint(this);
         QColor highlightColour("#59c4df");
         highlightColour.setAlpha(160);
@@ -507,7 +507,23 @@ TempoCurveWidget::labelToBarAndFractionUncached(QString label, bool *okp) const
 }
 
 double
-TempoCurveWidget::barToX(double bar, double barStart, double barEnd) const
+TempoCurveWidget::barToX(double bar) const
+{
+    double barStart = max(m_barDisplayStart, double(m_firstBar));
+    double barEnd = min(m_barDisplayEnd, m_lastBar + 1.0);
+    return barToXWith(bar, barStart, barEnd);
+}
+
+double
+TempoCurveWidget::xToBar(double x) const
+{
+    double barStart = max(m_barDisplayStart, double(m_firstBar));
+    double barEnd = min(m_barDisplayEnd, m_lastBar + 1.0);
+    return xToBarWith(x, barStart, barEnd);
+}
+
+double
+TempoCurveWidget::barToXWith(double bar, double barStart, double barEnd) const
 {
     double w = width() - m_margin;
     if (w <= 0.0) w = 1.0;
@@ -515,7 +531,7 @@ TempoCurveWidget::barToX(double bar, double barStart, double barEnd) const
 }
 
 double
-TempoCurveWidget::xToBar(double x, double barStart, double barEnd) const
+TempoCurveWidget::xToBarWith(double x, double barStart, double barEnd) const
 {
     double w = width() - m_margin;
     if (w <= 0.0) w = 1.0;
@@ -670,7 +686,7 @@ TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd)
         
         double bar(ibar);
         
-        double x = barToX(bar, barStart, barEnd);
+        double x = barToX(bar);
         paint.setPen(getForeground());
         paint.drawLine(x, 0, x, height());
 
@@ -680,7 +696,7 @@ TempoCurveWidget::paintBarAndBeatLines(double barStart, double barEnd)
         
         for (int i = 1; i < sig.first; ++i) {
             double barFrac = bar + double(i) / double(sig.first);
-            x = barToX(barFrac, barStart, barEnd);
+            x = barToX(barFrac);
             paint.setPen(Qt::gray);
             paint.drawLine(x, 0, x, height());
         }
@@ -733,11 +749,14 @@ TempoCurveWidget::paintCurve(ModelId audioModelId, QColor colour,
             SVDEBUG << "TempoCurveWidget::paintCurve: Failed to parse bar and fraction \"" << label << "\"" << endl;
             continue;
         }
-        if (bar < barStart) {
+        if (bar + 1.0 < barStart) {
+            continue;
+        }
+        if (bar > barEnd + 1.0) {
             continue;
         }
 
-        double x = barToX(bar, barStart, barEnd);
+        double x = barToX(bar);
 
         double y = m_coordinateScale.getCoordForValue(this, tempo);
 
@@ -1036,7 +1055,7 @@ TempoCurveWidget::identifyClosePoint(QPoint pos)
             double bar = labelToBarAndFraction(label, &ok);
             if (!ok) continue;
 
-            double px = barToX(bar, m_barDisplayStart, m_barDisplayEnd);
+            double px = barToX(bar);
             if (px < 0) continue;
 
             double dist = sqrt((px - x) * (px - x) + (py - y) * (py - y));

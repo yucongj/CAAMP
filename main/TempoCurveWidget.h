@@ -148,8 +148,11 @@ private:
     std::vector<std::pair<int, int>> m_timeSignatures; // index == bar no
     std::pair<int, int> getTimeSignature(int bar) const;
 
-    double barToX(double bar, double barStart, double barEnd) const;
-    double xToBar(double x, double barStart, double barEnd) const;
+    double barToX(double bar) const;
+    double barToXWith(double bar, double barStart, double barEnd) const;
+    
+    double xToBar(double x) const;
+    double xToBarWith(double x, double barStart, double barEnd) const;
 
     sv::EventVector extractCurve(sv::ModelId tempoCurveModelId) const;
     
