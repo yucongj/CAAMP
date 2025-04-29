@@ -636,12 +636,12 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
                     << ") at label = " << label << ", pos = " << pos << endl;
 #endif
 
-            if (isFirstNote && prevPos > 0.0) {
+            if (isFirstNote && firstNotePos < prevPos) {
                 // This is the first note but a previous beat has
-                // already been surpassed during it (prevPos > 0.0) so
-                // we need an event for that beat
+                // already been surpassed during it so we need an
+                // event for that beat
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
-                SVDEBUG << "TempoCurveWidget::extractCurve: The first note but spans a beat, permitting an event for prev beat" << endl;
+                SVDEBUG << "TempoCurveWidget::extractCurve: The first note spans a beat, permitting an event for prev beat" << endl;
 #endif
                 prevValue = value;
             }
@@ -687,12 +687,12 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
                 synthetic.push_back(s);
 
                 ++syntheticFrame;
-            }
             
-            prevPos = nextBeatPos;
-            prevValue = value;
+                prevPos = nextBeatPos;
+                prevValue = value;
 
-            acc = 0.0;
+                acc = 0.0;
+            }
             
             if (++beat >= num) {
                 ++bar;
