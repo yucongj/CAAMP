@@ -34,7 +34,7 @@
 using namespace std;
 using namespace sv;
 
-#define DEBUG_TEMPO_CURVE_WIDGET 1
+//#define DEBUG_TEMPO_CURVE_WIDGET 1
 
 static double defaultTempoMin = 40.0;
 static double defaultTempoMax = 200.0;
