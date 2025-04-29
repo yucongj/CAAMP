@@ -22,7 +22,7 @@ qt = import('qt6')
 qt_dep = dependency(
   'qt6',
   modules: [
-    'Core', 'Gui', 'Widgets', 'Xml', 'Network', 'Svg', 'Test', 'Pdf',
+    'Core', 'Gui', 'Widgets', 'Xml', 'Network', 'Svg', 'Test',
   ],
   main: true
 )
@@ -1104,6 +1104,7 @@ pp_main_files = [
   'main/ScoreFinder.cpp',
   'main/ScoreParser.cpp',
   'main/ScoreWidget.cpp',
+  'main/TempoCurveWidget.cpp',
   'main/vrvtrim.cpp',
   'piano-aligner/Score.cpp',
 ]
@@ -1459,6 +1460,7 @@ pp_main_moc_files = qt.preprocess(
   'main/PreferencesDialog.h',
   'main/Session.h',
   'main/ScoreWidget.h',
+  'main/TempoCurveWidget.h',
 ])
 
 checker_lib_files = [

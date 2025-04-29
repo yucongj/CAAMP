@@ -27,6 +27,8 @@
 
 #include "piano-aligner/Score.h"
 
+#include "TempoCurveWidget.h"
+
 class Session : public QObject
 {
     Q_OBJECT
@@ -47,8 +49,8 @@ public:
     sv::Pane *getPaneContainingOnsetsLayer();
     sv::TimeInstantLayer *getOnsetsLayerFromPane(sv::Pane *pane) const;
     
-    sv::TimeValueLayer *getTempoLayerForAudioModel(sv::ModelId);
-    sv::Pane *getPaneContainingTempoLayers();
+//!!!    sv::TimeValueLayer *getTempoLayerForAudioModel(sv::ModelId);
+//    sv::Pane *getPaneContainingTempoLayers();
 
     sv::ModelId getActiveAudioModel() const;
     QString getActiveAudioTitle() const;
@@ -71,7 +73,7 @@ public:
 public slots:
     void setDocument(sv::Document *,
                      sv::Pane *topAudioPane,
-                     sv::Pane *featurePane,
+                     TempoCurveWidget *tempoCurveWidget,
                      sv::View *overview,
                      sv::Layer *timeRuler);
 
@@ -112,7 +114,7 @@ signals:
     void alignmentAccepted();
     void alignmentRejected();
     void alignmentModified();
-    void alignmentFrameIlluminated(sv::sv_frame_t);
+    void alignmentEventIlluminated(sv::sv_frame_t, QString label);
 
     // This indicates a technical problem starting alignment, e.g. no
     // plugin available, not that the aligner failed to align
@@ -122,6 +124,8 @@ protected slots:
     void modelChanged(sv::ModelId);
     void modelChangedWithin(sv::ModelId, sv::sv_frame_t, sv::sv_frame_t);
     void modelReady(sv::ModelId);
+    void paneCentreOrZoomChanged();
+    void frameIlluminated(sv::sv_frame_t);
     
 private:
     // I don't own any of these. The SV main window owns the document
@@ -132,7 +136,7 @@ private:
     sv::TransformId m_alignmentTransformId;
 
     std::vector<sv::Pane *> m_audioPanes;
-    sv::Pane *m_featurePane;
+    TempoCurveWidget *m_tempoCurveWidget;
     sv::View *m_overview;
     sv::Pane *m_activePane; // an alias for one of the panes, or null
     sv::Layer *m_timeRulerLayer;
@@ -148,7 +152,7 @@ private:
 
     struct FeatureData {
         std::vector<AlignmentEntry> alignmentEntries;
-        sv::TimeValueLayer *tempoLayer;
+        sv::ModelId tempoModel;
         sv::WaveformLayer *overviewLayer;
         QString lastExportedTo;
         bool alignmentModified;
@@ -173,8 +177,10 @@ private:
     void alignmentComplete();
     void mergeLayers(sv::TimeInstantLayer *from, sv::TimeInstantLayer *to,
                      sv::sv_frame_t overlapStart, sv::sv_frame_t overlapEnd);
-    void recalculateTempoLayerFor(sv::ModelId audioModel);
+    void recalculateTempoCurveFor(sv::ModelId audioModel);
     void updateOnsetColours();
+
+    void updateTempoCurveExtentsFromActivePane();
 
     bool updateAlignmentEntriesFor(sv::ModelId audioModel);
     bool exportAlignmentEntries(sv::ModelId fromAudioModel, QString toFilePath);

@@ -1100,6 +1100,18 @@ ScoreWidget::showPage(int page)
 void
 ScoreWidget::setHighlightEventByLabel(EventLabel label)
 {
+    setHighlightEventByLabel(label, false);
+}
+
+void
+ScoreWidget::activateEventByLabel(EventLabel label)
+{
+    setHighlightEventByLabel(label, true);
+}
+
+void
+ScoreWidget::setHighlightEventByLabel(EventLabel label, bool activate)
+{
     m_eventToHighlight = getEventWithLabel(label);
     if (m_eventToHighlight.isNull()) {
         SVDEBUG << "ScoreWidget::setHighlightEventByLabel: Label \"" << label
@@ -1124,6 +1136,12 @@ ScoreWidget::setHighlightEventByLabel(EventLabel label)
         showPage(page);
     }
 
+    if (activate) {
+        emit scoreLocationActivated(m_eventToHighlight.location,
+                                    m_eventToHighlight.label,
+                                    m_mode);
+    }
+    
     update();
 }
 

@@ -22,6 +22,7 @@
 #include "PreferencesDialog.h"
 #include "Surveyer.h"
 
+#include "TempoCurveWidget.h"
 #include "ScoreWidget.h"
 #include "Session.h"
 #include "piano-aligner/Score.h"
@@ -58,6 +59,8 @@ public slots:
     void preferenceChanged(sv::PropertyContainer::PropertyName) override;
     virtual void coloursChanged();
 
+    virtual void resizeConstrained(QSize);
+    
     virtual bool commitData(bool mayAskUser);
 
     void goFullScreen();
@@ -161,16 +164,20 @@ protected slots:
     void alignmentModified();
     void alignmentAccepted();
     void alignmentRejected();
-    void alignmentFrameIlluminated(sv::sv_frame_t);
+    void alignmentEventIlluminated(sv::sv_frame_t, QString);
     void alignmentFailedToRun(QString);
     void populateScoreAlignerChoiceMenu();
     void scoreAlignerChosen(sv::TransformId);
     void highlightFrameInScore(sv::sv_frame_t);
+    void highlightLabelInScore(QString);
+    void highlightLabelInTempoCurve(QString);
+    void activateLabelInScore(QString);
     void scoreSelectionChanged(Fraction, bool, ScoreWidget::EventLabel, Fraction, bool, ScoreWidget::EventLabel);
     void scorePageChanged(int page);
     void scorePageDownButtonClicked();
     void scorePageUpButtonClicked();
     void alignButtonClicked();
+    void tempoCurveRequestedAudioModelChange(sv::ModelId audioModel);
 
     virtual void playSpeedChanged(int);
     void playSoloToggled() override;
@@ -225,12 +232,13 @@ protected slots:
     void newerVersionAvailable(QString) override;
 
 protected:
-    sv::Overview                *m_overview;
-    sv::LevelPanToolButton      *m_mainLevelPan;
-    sv::AudioDial               *m_playSpeed;
-    
-    QScrollArea             *m_mainScroll;
+    sv::Overview            *m_overview;
+    sv::LevelPanToolButton  *m_mainLevelPan;
+    sv::AudioDial           *m_playSpeed;
+    QSplitter               *m_tempoCurveSplitter;
+    TempoCurveWidget        *m_tempoCurveWidget;
     ScoreWidget             *m_scoreWidget;
+    QScrollArea             *m_mainScroll;
     QPushButton             *m_alignButton;
     QPushButton             *m_alignerChoice;
     QWidget                 *m_alignCommands;
