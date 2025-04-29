@@ -762,6 +762,11 @@ TempoCurveWidget::paintCurve(ModelId audioModelId, QColor colour,
 
     ModelId tempoModelId = m_tempoModels.at(audioModelId);
     auto model = ModelById::getAs<SparseTimeValueModel>(tempoModelId);
+    if (!model) {
+        SVDEBUG << "TempoCurveWidget::paintCurve: Tempo model " << tempoModelId
+                << " not found" << endl;
+        return;
+    }
     
     const EventVector &points = m_curves.at(audioModelId);
 
