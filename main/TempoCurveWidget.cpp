@@ -562,6 +562,7 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
     
     double prevPos = 0.0;
     double prevValue = 0.0;
+    double firstNotePos = 0.0;
 
     double eps = 1.0e-6;
 
@@ -570,8 +571,6 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
     for (const auto &ev : original) {
 
         double value = ev.getValue();
-        if (value <= 0.0) continue;
-
         QString label = ev.getLabel();
         bool ok = false;
         double pos = labelToBarAndFraction(label, &ok);
@@ -582,6 +581,15 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
                 << ", pos " << pos << ", value " << value << endl;
 #endif
 
+        if (value <= 0.0) {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+            SVDEBUG << "TempoCurveWidget::extractCurve: disregarding event with value " << value << endl;
+#endif
+            continue;
+        }
+
+        bool isFirstNote = (prevValue == 0.0);
+            
         while (true) {
 
             // A note may continue for several beats: tally up each
@@ -602,9 +610,16 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
             // at 1.0, 1.333, 1.666 etc.
             
             double nextBeatPos = double(bar) + double(beat + 1) / double(num);
+
+            if (isFirstNote) {
+                firstNotePos = pos;
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+                SVDEBUG << "TempoCurveWidget::extractCurve: This is the first note, setting firstNotePos to " << pos << endl;
+#endif
+            }
         
             if (pos + eps < nextBeatPos) { // prev note ends before next beat
-                if (prevValue > 0.0) {
+                if (!isFirstNote) {
                     acc += (pos - prevPos) * (1.0 / prevValue);
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
                     SVDEBUG << "TempoCurveWidget::extractCurve: added "
@@ -620,20 +635,20 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
                     << beat+1 << " of bar " << bar << " (per bar = " << num
                     << ") at label = " << label << ", pos = " << pos << endl;
 #endif
-            
-            if (prevValue == 0.0 && prevPos > 0.0) {
-                // This is the first event (prevValue == 0.0) but a
-                // previous beat has already been surpassed during it
-                // (prevPos > 0.0) so we need an event for that beat
+
+            if (isFirstNote && prevPos > 0.0) {
+                // This is the first note but a previous beat has
+                // already been surpassed during it (prevPos > 0.0) so
+                // we need an event for that beat
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
-                SVDEBUG << "TempoCurveWidget::extractCurve: This is the first note but it spans a beat, adding an event for prev beat" << endl;
+                SVDEBUG << "TempoCurveWidget::extractCurve: The first note but spans a beat, permitting an event for prev beat" << endl;
 #endif
                 prevValue = value;
             }
 
             if (prevValue == 0.0) {
-                // This is the first event and the above check didn't
-                // change anything
+                // NB we test prevValue here, not isFirstNote, because
+                // the above check may have changed our view of it
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
                 SVDEBUG << "TempoCurveWidget::extractCurve: This is the first note, not adding an event for prev note" << endl;
 #endif
@@ -642,6 +657,18 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
                 acc += (nextBeatPos - prevPos) * (1.0 / prevValue);
 
                 double beatDuration = 1.0 / double(num); // in bars
+
+                if (firstNotePos > nextBeatPos - beatDuration &&
+                    firstNotePos < nextBeatPos) {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+                    SVDEBUG << "TempoCurveWidget::extractCurve: this is a partial beat with firstNotePos at "
+                            << firstNotePos << ", adjusting beat duration from "
+                            << beatDuration << " to "
+                            << nextBeatPos - firstNotePos << endl;
+#endif
+                    beatDuration = nextBeatPos - firstNotePos;
+                }
+
                 double syntheticValue = beatDuration / acc;
                 QString syntheticLabel =
                     QString("%1+%2/%3").arg(bar).arg(beat).arg(denom);
@@ -649,7 +676,7 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
                 SVDEBUG << "TempoCurveWidget::extractCurve: finalised acc with "
                         << (nextBeatPos - prevPos) << " * " << (1.0 / prevValue)
-                        << " -> now " << acc << ", beat = "
+                        << " -> now " << acc << ", beat duration = "
                         << beatDuration << ", beat/acc = "
                         << syntheticValue << " for label "
                         << syntheticLabel << " at index " << syntheticFrame
