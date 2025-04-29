@@ -748,12 +748,6 @@ MainWindow::~MainWindow()
 }
 
 void
-MainWindow::resizeConstrained(QSize size)
-{
-    MainWindowBase::resizeConstrained(size);
-}
-
-void
 MainWindow::setupMenus()
 {
     SVDEBUG << "MainWindow::setupMenus" << endl;

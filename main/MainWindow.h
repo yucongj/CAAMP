@@ -59,8 +59,6 @@ public slots:
     void preferenceChanged(sv::PropertyContainer::PropertyName) override;
     virtual void coloursChanged();
 
-    virtual void resizeConstrained(QSize);
-    
     virtual bool commitData(bool mayAskUser);
 
     void goFullScreen();
