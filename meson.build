@@ -2,7 +2,7 @@
 project(
   'Performance Precision',
   'c', 'cpp',
-  version: '1.2.0',
+  version: '1.3.0',
   license: 'GPL-2.0-or-later',
   default_options: [
     'cpp_std=c++17',
