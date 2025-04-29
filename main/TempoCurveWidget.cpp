@@ -34,7 +34,7 @@
 using namespace std;
 using namespace sv;
 
-//#define DEBUG_TEMPO_CURVE_WIDGET 1
+#define DEBUG_TEMPO_CURVE_WIDGET 1
 
 static double defaultTempoMin = 40.0;
 static double defaultTempoMax = 200.0;
@@ -603,7 +603,7 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
             
             double nextBeatPos = double(bar) + double(beat + 1) / double(num);
         
-            if (pos + eps < nextBeatPos) { // note ends before next beat
+            if (pos + eps < nextBeatPos) { // prev note ends before next beat
                 if (prevValue > 0.0) {
                     acc += (pos - prevPos) * (1.0 / prevValue);
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
@@ -620,30 +620,47 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
                     << beat+1 << " of bar " << bar << " (per bar = " << num
                     << ") at label = " << label << ", pos = " << pos << endl;
 #endif
-
-            acc += (nextBeatPos - prevPos) * (1.0 / prevValue);
-
-#ifdef DEBUG_TEMPO_CURVE_WIDGET
-            SVDEBUG << "TempoCurveWidget::extractCurve: finalised acc with "
-                    << (nextBeatPos - prevPos) << " * " << (1.0 / prevValue)
-                    << " is now " << acc << ", 1/acc = " << 1/acc << endl;
-#endif
-
-            double syntheticValue = (1.0 / double(num)) / acc;
-            QString syntheticLabel =
-                QString("%1+%2/%3").arg(bar).arg(beat).arg(denom);
-
-#ifdef DEBUG_TEMPO_CURVE_WIDGET
-            SVDEBUG << "TempoCurveWidget::extractCurve: adding synthetic event "
-                    << "with value " << syntheticValue << " and label "
-                    << syntheticLabel << " at index " << syntheticFrame
-                    << endl;
-#endif
             
-            Event s(syntheticFrame, syntheticValue, syntheticLabel);
-            synthetic.push_back(s);
+            if (prevValue == 0.0 && prevPos > 0.0) {
+                // This is the first event (prevValue == 0.0) but a
+                // previous beat has already been surpassed during it
+                // (prevPos > 0.0) so we need an event for that beat
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+                SVDEBUG << "TempoCurveWidget::extractCurve: This is the first note but it spans a beat, adding an event for prev beat" << endl;
+#endif
+                prevValue = value;
+            }
 
-            ++syntheticFrame;
+            if (prevValue == 0.0) {
+                // This is the first event and the above check didn't
+                // change anything
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+                SVDEBUG << "TempoCurveWidget::extractCurve: This is the first note, not adding an event for prev note" << endl;
+#endif
+            } else {
+
+                acc += (nextBeatPos - prevPos) * (1.0 / prevValue);
+
+                double beatDuration = 1.0 / double(num); // in bars
+                double syntheticValue = beatDuration / acc;
+                QString syntheticLabel =
+                    QString("%1+%2/%3").arg(bar).arg(beat).arg(denom);
+
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+                SVDEBUG << "TempoCurveWidget::extractCurve: finalised acc with "
+                        << (nextBeatPos - prevPos) << " * " << (1.0 / prevValue)
+                        << " -> now " << acc << ", beat = "
+                        << beatDuration << ", beat/acc = "
+                        << syntheticValue << " for label "
+                        << syntheticLabel << " at index " << syntheticFrame
+                        << endl;
+#endif
+
+                Event s(syntheticFrame, syntheticValue, syntheticLabel);
+                synthetic.push_back(s);
+
+                ++syntheticFrame;
+            }
             
             prevPos = nextBeatPos;
             prevValue = value;
