@@ -140,6 +140,7 @@
 #include <QActionGroup>
 #include <QFileDialog>
 #include <QDockWidget>
+#include <QSplitter>
 
 #include <iostream>
 #include <cstdio>
@@ -563,6 +564,14 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
 
     m_mainScroll->setWidget(m_paneStack);
 
+    m_tempoCurveWidget = new TempoCurveWidget(frame);
+    connect(m_tempoCurveWidget, &TempoCurveWidget::changeCurrentAudioModel,
+            this, &MainWindow::tempoCurveRequestedAudioModelChange);
+    connect(m_tempoCurveWidget, &TempoCurveWidget::highlightLabel,
+            this, &MainWindow::highlightLabelInScore);
+    connect(m_tempoCurveWidget, &TempoCurveWidget::activateLabel,
+            this, &MainWindow::activateLabelInScore);
+    
     m_overview = new Overview(frame);
     m_overview->setViewManager(m_viewManager);
     int overviewHeight = m_viewManager->scalePixelSize(35);
@@ -606,7 +615,13 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
 
     layout->setSpacing(m_viewManager->scalePixelSize(4));
 
-    layout->addWidget(m_mainScroll, 0, 0, 1, 3);
+    m_tempoCurveSplitter = new QSplitter;
+    m_tempoCurveSplitter->setOrientation(Qt::Vertical);
+    m_tempoCurveSplitter->addWidget(m_mainScroll);
+    m_tempoCurveSplitter->addWidget(m_tempoCurveWidget);
+    m_tempoCurveSplitter->setSizes({ 120, 80 });
+    layout->addWidget(m_tempoCurveSplitter, 0, 0, 1, 3);
+    
     layout->addWidget(m_overview, 1, 0);
     layout->addWidget(m_playSpeed, 1, 1);
     layout->addWidget(m_mainLevelPan, 1, 2);
@@ -696,18 +711,18 @@ MainWindow::MainWindow(AudioMode audioMode, MIDIMode midiMode, bool withOSCSuppo
     
     m_showPropertyBoxesAction->trigger();
 
-    connect(&m_session, SIGNAL(alignmentReadyForReview(sv::Pane *, sv::Layer *)),
-            this, SLOT(alignmentReadyForReview(sv::Pane *, sv::Layer *)));
-    connect(&m_session, SIGNAL(alignmentModified()),
-            this, SLOT(alignmentModified()));
-    connect(&m_session, SIGNAL(alignmentAccepted()),
-            this, SLOT(alignmentAccepted()));
-    connect(&m_session, SIGNAL(alignmentRejected()),
-            this, SLOT(alignmentRejected()));
-    connect(&m_session, SIGNAL(alignmentFrameIlluminated(sv_frame_t)),
-            this, SLOT(alignmentFrameIlluminated(sv_frame_t)));
-    connect(&m_session, SIGNAL(alignmentFailedToRun(QString)),
-            this, SLOT(alignmentFailedToRun(QString)));
+    connect(&m_session, &Session::alignmentReadyForReview,
+            this, &MainWindow::alignmentReadyForReview);
+    connect(&m_session, &Session::alignmentModified,
+            this, &MainWindow::alignmentModified);
+    connect(&m_session, &Session::alignmentAccepted,
+            this, &MainWindow::alignmentAccepted);
+    connect(&m_session, &Session::alignmentRejected,
+            this, &MainWindow::alignmentRejected);
+    connect(&m_session, &Session::alignmentEventIlluminated,
+            this, &MainWindow::alignmentEventIlluminated);
+    connect(&m_session, &Session::alignmentFailedToRun,
+            this, &MainWindow::alignmentFailedToRun);
 
     QTimer::singleShot(250, this, &MainWindow::introduction);
 
@@ -2702,8 +2717,10 @@ MainWindow::openScoreFile(QString scoreName, QString scoreFile)
         SVCERR << "MainWindow::chooseScore: Failed to load meter data from meter file path \"" << meterPath << "\"" << endl;
         return;
     }
-    m_session.setMusicalEvents(m_scoreId, m_score.getMusicalEvents());
-    m_scoreWidget->setMusicalEvents(m_score.getMusicalEvents());
+    auto musicalEvents = m_score.getMusicalEvents();
+    m_session.setMusicalEvents(m_scoreId, musicalEvents);
+    m_scoreWidget->setMusicalEvents(musicalEvents);
+    m_tempoCurveWidget->setMusicalEvents(musicalEvents);
 
     auto recordingDirectory =
         ScoreFinder::getUserRecordingDirectory(scoreName.toStdString(), false);
@@ -2773,9 +2790,32 @@ MainWindow::highlightFrameInScore(sv_frame_t frame)
 {
     QString label = m_scoreBasedFrameAligner->mapToScoreLabel(frame);
     if (label == "") {
+        SVDEBUG << "highlightFrameInScore: Unable to map frame "
+                << frame << " to a score label" << endl;
         return;
     }
+    highlightLabelInScore(label);
+    highlightLabelInTempoCurve(label);
+}
+
+void
+MainWindow::highlightLabelInTempoCurve(QString label)
+{
+    m_tempoCurveWidget->setHighlightedPosition(label);
+}
+
+void
+MainWindow::highlightLabelInScore(QString label)
+{
     m_scoreWidget->setHighlightEventByLabel(label.toStdString());
+    scoreInteractionEnded(m_scoreWidget->getInteractionMode());
+}
+
+void
+MainWindow::activateLabelInScore(QString label)
+{
+    m_scoreWidget->activateEventByLabel(label.toStdString());
+    scoreInteractionEnded(m_scoreWidget->getInteractionMode());
 }
 
 void
@@ -2987,11 +3027,19 @@ MainWindow::scoreInteractionEnded(ScoreWidget::InteractionMode)
 }
 
 void
-MainWindow::alignmentFrameIlluminated(sv_frame_t frame)
+MainWindow::alignmentEventIlluminated(sv_frame_t frame, QString label)
 {
+    SVDEBUG << "MainWindow::alignmentEventIlluminated("
+            << frame << ", " << label << ")" << endl;
+    
     if (m_scoreWidget->getInteractionMode() ==
         ScoreWidget::InteractionMode::Edit) {
-        highlightFrameInScore(frame);
+
+        if (label == "") {
+            highlightFrameInScore(frame);
+        } else {
+            highlightLabelInScore(label);
+        }
     }
 }
 
@@ -3127,6 +3175,8 @@ MainWindow::alignmentReadyForReview(Pane *onsetsPane, Layer *onsetsLayer)
     m_alignCommands->hide();
     m_alignAcceptReject->show();
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
@@ -3135,6 +3185,8 @@ MainWindow::alignmentModified()
 {
     SVDEBUG << "MainWindow::alignmentModified" << endl;
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
@@ -3156,6 +3208,8 @@ MainWindow::alignmentAccepted()
 
     m_paneStack->setCurrentLayer(onsetsPane, onsetsLayer);
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
@@ -3177,6 +3231,8 @@ MainWindow::alignmentRejected()
 
     m_paneStack->setCurrentLayer(onsetsPane, onsetsLayer);
 
+    m_tempoCurveWidget->update();
+    
     updateMenuStates();
 }
 
@@ -3915,7 +3971,7 @@ MainWindow::importMoreAudio()
     // Add the new audio in a new pane in penultimate position
     
     int paneCountBefore = m_paneStack->getPaneCount();
-    int addAtIndex = paneCountBefore - 1;
+    int addAtIndex = paneCountBefore /* - 1 */;
     
     AddPaneCommand *command = new AddPaneCommand(this, addAtIndex);
     CommandHistory::getInstance()->addCommand(command);
@@ -3934,6 +3990,8 @@ MainWindow::importMoreAudio()
     m_session.addFurtherAudioPane(pane);
     m_paneStack->sizePanesEqually();
 
+    currentPaneChanged(pane);
+    
     updateWindowTitle();
     updateMenuStates();
 }
@@ -4717,19 +4775,12 @@ MainWindow::documentReplaced()
     m_document->setAutoAlignment(true); // for audio-to-audio alignment
     
     Pane *topPane = m_paneStack->addPane();
-    Pane *bottomPane = m_paneStack->addPane();
-
     topPane->setSelectionSnapToFeatures(false);
-    bottomPane->setSelectionSnapToFeatures(false);
     
     connect(topPane, SIGNAL(contextHelpChanged(const QString &)),
             this, SLOT(contextHelpChanged(const QString &)));
 
-    connect(bottomPane, SIGNAL(contextHelpChanged(const QString &)),
-            this, SLOT(contextHelpChanged(const QString &)));
-
     m_overview->registerView(topPane);
-    m_overview->registerView(bottomPane);
 
     if (!m_timeRulerLayer) {
         m_timeRulerLayer = m_document->createMainModelLayer
@@ -4740,7 +4791,7 @@ MainWindow::documentReplaced()
 
     SVDEBUG << "MainWindow::documentReplaced: Added views, now calling m_session.setDocument" << endl;
     
-    m_session.setDocument(m_document, topPane, bottomPane,
+    m_session.setDocument(m_document, topPane, m_tempoCurveWidget,
                           m_overview, m_timeRulerLayer);
 
     CommandHistory::getInstance()->clear();
@@ -5942,6 +5993,24 @@ MainWindow::restoreNormalPlayback()
 }
 
 void
+MainWindow::tempoCurveRequestedAudioModelChange(ModelId audioModel)
+{
+    for (int i = 0; i < m_paneStack->getPaneCount(); ++i) {
+        Pane *pane = m_paneStack->getPane(i);
+        if (!pane) continue;
+        for (int j = 0; j < pane->getLayerCount(); ++j) {
+            Layer *layer = pane->getLayer(j);
+            if (!layer) continue;
+            if (dynamic_cast<SpectrogramLayer *>(layer) &&
+                layer->getModel() == audioModel) {
+                m_paneStack->setCurrentPane(pane);
+                return;
+            }
+        }
+    }
+}
+
+void
 MainWindow::currentPaneChanged(Pane *pane)
 {
     // We don't call MainWindowBase::currentPaneChanged from this.
@@ -5961,15 +6030,18 @@ MainWindow::currentPaneChanged(Pane *pane)
     sv_frame_t playingFrame = 0;
     if (m_playSource && m_playSource->isPlaying()) {
         playingFrame = m_playSource->getCurrentPlayingFrame();
-        m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
-            (m_session.getOnsetsLayer(), playingFrame, scoreLabel, proportion);
         wasPlaying = true;
-        SVDEBUG << "currentPaneChanged: mapped current playing frame "
-                << playingFrame << " to score label " << scoreLabel
-                << " and proportion " << proportion << endl;
-        if (scoreLabel != "") {
-            m_playSource->stop();
-        }
+    } else {
+        playingFrame = m_viewManager->getPlaybackFrame();
+    }
+
+    m_scoreBasedFrameAligner->mapToScoreLabelAndProportion
+        (m_session.getOnsetsLayer(), playingFrame, scoreLabel, proportion);
+    SVDEBUG << "currentPaneChanged: mapped current frame "
+            << playingFrame << " to score label " << scoreLabel
+            << " and proportion " << proportion << endl;
+    if (scoreLabel != "" && wasPlaying) {
+        m_playSource->stop();
     }
 
     for (int i = pane->getLayerCount(); i > 0; ) {
@@ -6020,14 +6092,16 @@ MainWindow::currentPaneChanged(Pane *pane)
         m_playSource->setSoloModelSet({});
     }
     
-    if (wasPlaying) {
-        if (scoreLabel != "") {
-            m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
-                (m_session.getOnsetsLayer(), scoreLabel, proportion, playingFrame);
-            SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
-                    << " and proportion " << proportion
-                    << " back to playback frame " << playingFrame << endl;
+    if (scoreLabel != "") {
+        m_scoreBasedFrameAligner->mapFromScoreLabelAndProportion
+            (m_session.getOnsetsLayer(), scoreLabel, proportion, playingFrame);
+        SVDEBUG << "currentPaneChanged: mapped score label " << scoreLabel
+                << " and proportion " << proportion
+                << " back to playback frame " << playingFrame << endl;
+        if (wasPlaying) {
             m_playSource->play(playingFrame);
+        } else {
+            m_viewManager->setPlaybackFrame(playingFrame);
         }
     }
 
