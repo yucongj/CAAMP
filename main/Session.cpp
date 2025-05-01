@@ -742,6 +742,9 @@ Session::frameIlluminated(sv_frame_t frame)
     auto model = ModelById::getAs<SparseOneDimensionalModel>(layer->getModel());
     if (!model) return;
 
+    SVDEBUG << "Session::frameIlluminated(" << frame << ") from layer "
+            << layer << " with model id " << layer->getModel() << endl;
+    
     auto events = model->getEventsStartingAt(frame);
     QString label;
 

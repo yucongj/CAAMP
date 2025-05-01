@@ -2790,6 +2790,8 @@ MainWindow::highlightFrameInScore(sv_frame_t frame)
 {
     QString label = m_scoreBasedFrameAligner->mapToScoreLabel(frame);
     if (label == "") {
+        SVDEBUG << "highlightFrameInScore: Unable to map frame "
+                << frame << " to a score label" << endl;
         return;
     }
     highlightLabelInScore(label);
@@ -2806,12 +2808,14 @@ void
 MainWindow::highlightLabelInScore(QString label)
 {
     m_scoreWidget->setHighlightEventByLabel(label.toStdString());
+    scoreInteractionEnded(m_scoreWidget->getInteractionMode());
 }
 
 void
 MainWindow::activateLabelInScore(QString label)
 {
     m_scoreWidget->activateEventByLabel(label.toStdString());
+    scoreInteractionEnded(m_scoreWidget->getInteractionMode());
 }
 
 void
@@ -3025,6 +3029,9 @@ MainWindow::scoreInteractionEnded(ScoreWidget::InteractionMode)
 void
 MainWindow::alignmentEventIlluminated(sv_frame_t frame, QString label)
 {
+    SVDEBUG << "MainWindow::alignmentEventIlluminated("
+            << frame << ", " << label << ")" << endl;
+    
     if (m_scoreWidget->getInteractionMode() ==
         ScoreWidget::InteractionMode::Edit) {
 
