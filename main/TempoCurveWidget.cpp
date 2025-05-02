@@ -670,8 +670,12 @@ TempoCurveWidget::extractCurve(ModelId tempoCurveModelId) const
                 }
 
                 double syntheticValue = beatDuration / acc;
+                Fraction frac(beat, denom); // To reduce to simplest form
                 QString syntheticLabel =
-                    QString("%1+%2/%3").arg(bar).arg(beat).arg(denom);
+                    QString("%1+%2/%3")
+                    .arg(bar)
+                    .arg(frac.numerator)
+                    .arg(frac.denominator);
 
 #ifdef DEBUG_TEMPO_CURVE_WIDGET
                 SVDEBUG << "TempoCurveWidget::extractCurve: finalised acc with "
@@ -977,6 +981,9 @@ TempoCurveWidget::mouseMoveEvent(QMouseEvent *e)
 
     if (!m_clickedInRange) {
         if (identifyClosePoint(e->pos())) {
+#ifdef DEBUG_TEMPO_CURVE_WIDGET
+            SVDEBUG << "TempoCurveWidget::mouseMoveEvent: Found close point, asking to highlight label \"" << m_closeLabel << "\"" << endl;
+#endif
             emit highlightLabel(m_closeLabel);
             update();
         }

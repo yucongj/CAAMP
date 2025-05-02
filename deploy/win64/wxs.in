@@ -204,6 +204,22 @@
                 Name="msvcp140.dll"
                 Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140.DLL"/>
             <File
+                Id="msvcp140_1"
+                Name="msvcp140_1.dll"
+                Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140_1.DLL"/>
+            <File
+                Id="msvcp140_2"
+                Name="msvcp140_2.dll"
+                Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140_2.DLL"/>
+            <File
+                Id="msvcp140_atomic_wait"
+                Name="msvcp140_atomic_wait.dll"
+                Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140_atomic_wait.DLL"/>
+            <File
+                Id="msvcp140_codecvt_ids"
+                Name="msvcp140_codecvt_ids.dll"
+                Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140_codecvt_ids.DLL"/>
+            <File
                 Id="vccorlib140"
                 Name="vccorlib140.dll"
                 Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\vccorlib140.DLL"/>
@@ -272,6 +288,18 @@
                   Id="msvcp140h"
                   Name="msvcp140.dll"
                   Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140.DLL"/>
+              <File
+                  Id="msvcp140_1h"
+                  Name="msvcp140_1.dll"
+                  Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140_1.DLL"/>
+              <File
+                  Id="msvcp140_2h"
+                  Name="msvcp140_2.dll"
+                  Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140_2.DLL"/>
+              <File
+                  Id="msvcp140_codecvt_idsh"
+                  Name="msvcp140_codecvt_ids.dll"
+                  Source="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Redist\MSVC\@REDIST_VER@\x64\Microsoft.VC142.CRT\msvcp140_codecvt_ids.DLL"/>
               <File
                   Id="vccorlib140h"
                   Name="vccorlib140.dll"
