@@ -90,3 +90,31 @@ Your plugin should provide the alignment result to the host (*Performance Precis
 Your plugin needs to parse and represent scores in the same way as the host. The code is already provided in `Score.h` and `Score.cpp`. A score is represented as a sequence of `MusicalEvent`s, containing each event's score time information and note information, etc. When an MEI score is loaded to the host, the host processes the score (using `verovio`) and writes out some intermediate files for both the host and the plugin to further parse the score. These intermediate files have the file extensions such as `.solo` and `.meter`, and they will be automatically deleted when the score is unloaded. Both the host and the plugin then parse these files to represent the score.
 
 
+## Relevant Citations
+
+
+```
+@InProceedings{PianoPrecision,
+  author =    {Jiang, Yucong and Weigl, David M. and Goebl, Werner},
+  title =     {Piano Precision: Advancing Music Performance Analysis by Integrating User-correctable Audio-to-score Alignment},
+  booktitle = {Proceedings of the 22nd Sound and Music Computing Conference (SMC)},
+  pages =     {160--167},
+  month =     {July},
+  year =      {2025},
+  address =   {Graz, Austria},
+  doi =       {10.5281/zenodo.15838699},
+  url =       {https://doi.org/10.5281/zenodo.15838699}
+}
+
+@InProceedings{PerformancePrecision,
+  author =    {Jiang, Yucong},
+  title =     {Performance Precision: a Software Prototype for Computer-assisted Annotation and Analysis of Music Performance},
+  booktitle = {Proceedings of the 50th International Computer Music Conference (ICMC)},
+  pages =     {627--628},
+  month =     {June},
+  year =      {2025},
+  address =   {Boston, USA},
+  doi =       {10.5281/zenodo.18319108},
+  url =       {https://doi.org/10.5281/zenodo.18319108}
+}
+```
