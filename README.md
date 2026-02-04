@@ -16,7 +16,7 @@ CAAMP: Computer-assisted Annotation and Analysis of Music Performance
   <img src="logo_neh.jpg" align="left" alt="drawing" width="200" style="margin-right: 20px;" />
 </a>
 <br>
-This project is supported by the National Endowment for the Humanities through a Digital Humanities Advancement Grant.
+This project has been supported by the National Endowment for the Humanities through a Digital Humanities Advancement Grant.
 
 ------
 
@@ -92,6 +92,7 @@ Your plugin needs to parse and represent scores in the same way as the host. The
 
 ## Relevant Citations
 
+This paper describes the software as well as a user study in detail:
 
 ```
 @InProceedings{PianoPrecision,
@@ -105,7 +106,10 @@ Your plugin needs to parse and represent scores in the same way as the host. The
   doi =       {10.5281/zenodo.15838699},
   url =       {https://doi.org/10.5281/zenodo.15838699}
 }
+```
+This paper gives a concise overview of the software:
 
+```
 @InProceedings{PerformancePrecision,
   author =    {Jiang, Yucong},
   title =     {Performance Precision: a Software Prototype for Computer-assisted Annotation and Analysis of Music Performance},
