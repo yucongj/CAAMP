@@ -1002,6 +1002,8 @@ void GenerateTimemapFunctor::AddTimemapEntry(const Object *object)
                   std::to_string(sig->GetTotalCount())+"/"+std::to_string(sig->GetUnit());
             } else if (sig->GetSym() == METERSIGN_common) {
                 startEntry.meterSig = std::to_string(measure->GetIndex())+" 4/4";
+            } else if (sig->GetSym() == METERSIGN_cut) {
+                startEntry.meterSig = std::to_string(measure->GetIndex())+" 2/2";
             } else {
                 std::cout<<"Warning: check special time signature!"<<std::endl;
             }
